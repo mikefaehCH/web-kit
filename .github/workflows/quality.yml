@@ -1,0 +1,23 @@
+name: Web-kit quality
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  repository:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify repository baseline
+        run: |
+          git diff --check
+          test -s README.md
+          test -s AGENTS.md
+          test -s RELEASE_POLICY.md
+          test -f .github/workflows/autonomous-merge.yml
+      - name: Explicit limitation
+        run: echo 'Scaffold quality only; no generator, E2E or deployment validation yet.'
