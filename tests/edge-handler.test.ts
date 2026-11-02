@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { handle, GROUP_ID, type Deps } from "../supabase/functions/web-kit-whatsapp-send/handler.ts";
 
-const ORIGIN = "https://mikefaehch.github.io";
+const ORIGIN = "https://web-kit-admin.onrender.com";
 const ADMIN = { id: "11111111-1111-4111-8111-111111111111", app_metadata: { web_kit_admin: true } };
 const KEY = "aaaaaaaa-0000-4000-8000-000000000001";
 const JWT = "Bearer eyJhbGciOiJIUzI1NiJ9.test.signature";
@@ -22,7 +22,7 @@ function setup(over: Partial<{
   const rpc: Call[] = [];
   const fetches: { url: string; body: unknown }[] = [];
   const logs: string[] = [];
-  const env: Record<string, string | undefined> = { GREEN_API_TOKEN: TOKEN, ...over.env };
+  const env: Record<string, string | undefined> = { GREEN_API_TOKEN: TOKEN, WEB_KIT_ADMIN_ORIGIN: ORIGIN, ...over.env };
   const deps: Deps = {
     env: (n) => env[n],
     getUser: async () => (over.user === undefined ? ADMIN : over.user),
@@ -190,4 +190,24 @@ test("keine Secrets oder Nachrichtentexte in Antworten und Logs", async () => {
       assert.ok(!out.includes(ADMIN.id), "User-ID im Log");
     }
   }
+});
+
+
+test("fehlende oder ungueltige Admin-Origin blockiert alle Requests ohne Versand", async () => {
+  for (const value of [undefined, "", "http://insecure.example", "https://example.com/path"]) {
+    const t = setup({ env: { WEB_KIT_ADMIN_ORIGIN: value } });
+    const res = await handle(req(ok), t.deps);
+    assert.equal(res.status, 503);
+    assert.equal(t.fetches.length + t.rpc.length, 0);
+    assert.notEqual(res.headers.get("access-control-allow-origin"), "https://mikefaehch.github.io");
+  }
+});
+
+test("fehlender Origin-Header wird abgewiesen", async () => {
+  const t = setup();
+  const request = new Request("https://x.supabase.co/functions/v1/web-kit-whatsapp-send", {
+    method: "POST", headers: { authorization: JWT, "content-type": "application/json" }, body: JSON.stringify(ok),
+  });
+  assert.equal((await handle(request, t.deps)).status, 403);
+  assert.equal(t.fetches.length + t.rpc.length, 0);
 });
