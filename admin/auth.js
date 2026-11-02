@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import { createClient } from './vendor/supabase.js';
 const url='https://qoensghjemruqafrbmjd.supabase.co';
 const publishable='sb_publishable_Qeom38G18vSgrrE5MxoXEw_LhJM1f6S';
 const sb=createClient(url,publishable,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true,flowType:'pkce'}});

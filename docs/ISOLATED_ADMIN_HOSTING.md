@@ -16,8 +16,15 @@ Ziel: `admin/` auf einer separaten HTTPS-Origin hosten, **nicht** unter `mikefae
 
 Eine separate Origin isoliert Web Storage und Auth-Sitzung von anderen GitHub-Pages-Sites, ersetzt aber keine serverseitige Admin-Autorisierung. Supabase-RPCs bleiben service_role-only. Tokens gehören niemals in HTML, Repository oder Build-Logs. `render.yaml` enthält keine Secrets.
 
-## Restrisiko und nächste technische Härtung
+## Build und Abhängigkeiten
 
-Die CSP erlaubt vorläufig `https://esm.sh`, da `admin/auth.js` Supabase-JavaScript dort lädt. Das ist **keine** vollständige Absicherung gegen eine kompromittierte CDN-Abhängigkeit. Vor dem Live-Rollout die Bibliothek reproduzierbar und lokal bereitstellen, CSP auf `script-src 'self'` einschränken und den Login mit PKCE im Browser end-to-end testen.
+- Der Admin verwendet `@supabase/supabase-js` 2.118.0 aus dem lokalen Bundle `admin/vendor/supabase.js`; es gibt zur Laufzeit keine JavaScript-Anfrage an ein CDN. `admin/package-lock.json` pinnt Build- und Laufzeit-Abhängigkeiten.
+- Das Bundle wird reproduzierbar mit `npm ci --prefix admin --ignore-scripts` und `npm run --prefix admin build:vendor` erstellt. CI vergleicht das erzeugte Bundle mit der eingecheckten Datei.
+- `node admin/build-static.mjs` kopiert nur die benötigten HTML/CSS/JS-Dateien und Lizenzhinweise nach `admin/dist`. Der Render-Blueprint veröffentlicht ausschliesslich dieses Verzeichnis.
+- Die CSP erlaubt Skripte nur von `'self'`; `connect-src` ist auf das Supabase-Projekt begrenzt. `npm audit --prefix admin` meldete bei Prüfung am 2.11.2026 keine bekannten Schwachstellen.
 
-Das Edge-Function-Verhalten bleibt separat zu härten: `WEB_KIT_ADMIN_ORIGIN` darf **keinen** GitHub-Pages-Fallback besitzen. Ohne Konfiguration muss die Funktion fail-closed antworten. Das ist eine Backend-Änderung, kein reines Hosting-Header-Thema.
+## Nicht produktiv aktiviert
+
+Der Render-Blueprint ist noch kein angelegter oder veröffentlichter Service. Bis eine echte Render-Origin eingerichtet, als `WEB_KIT_ADMIN_ORIGIN` gesetzt und die Edge Function aus PR #11 deployt wurde, bleibt der isolierte Admin nicht verfügbar. GitHub Pages darf nicht als Admin-Origin verwendet werden, weil dort gehostete Projekte dieselbe Origin teilen.
+
+Vor Livegang weiterhin erforderlich: echte Render-URL, Supabase Redirect-URL, `WEB_KIT_ADMIN_ORIGIN`, unabhängige Approval und E2E-Tests mit PKCE. Es wurden keine echten Nachrichten versendet.

@@ -1,15 +1,17 @@
 # Admin und WhatsApp
 
-Admin-Einstieg: `admin/whatsapp.html` (nach GitHub Pages Deployment).
+Admin-Einstieg: `admin/whatsapp.html` auf einer dedizierten Render-Origin. **GitHub Pages ist dafür nicht zulässig**, da Pages-Projekte desselben Kontos dieselbe Browser-Origin teilen.
+
+Status: `render.yaml` ist nur ein Blueprint. Es existiert noch kein bestätigter Render-Service bzw. keine produktive Admin-Origin. Nicht für Liveversand verwenden.
 
 ## Voraussetzungen für produktiven Betrieb
 
-1. In Supabase Auth unter URL Configuration `https://mikefaehch.github.io/web-kit/admin/whatsapp.html` als Redirect URL zulassen.
+1. Eine tatsächliche HTTPS-Origin des Render-Service einrichten. Erst dann genau `https://<render-origin>/whatsapp.html` in Supabase Auth als Redirect URL zulassen.
 2. Bereits existierendes Supabase Auth-Konto verwenden. E-Mail Magic Link erstellt ausdrücklich **keine** neuen Benutzer.
 3. Admin-Rechte ausschliesslich serverseitig durch berechtigte Projektadministratoren in `auth.users.raw_app_meta_data.web_kit_admin = true` setzen. Nicht über `user_metadata` und nicht aus dem Browser.
 4. `GREEN_API_TOKEN` muss in Edge Function Secrets gesetzt sein. Niemals in GitHub, JavaScript oder Logs kopieren.
 5. Vor Livegang Test mit einem berechtigten Admin durchführen; CORS- und JWT-Konfiguration prüfen.
-6. GitHub Pages für `main` aktivieren, sofern noch nicht geschehen.
+6. Keine GitHub-Pages-Origin als Admin freigeben. Für den statischen Render-Deploy publiziert `render.yaml` nur `admin/dist`, das mit `node admin/build-static.mjs` erstellt wird.
 
 ## Versand und Schutz
 
@@ -19,7 +21,7 @@ Pro Admin und Stunde höchstens zehn Versandversuche. Jeder Request erhält eine
 
 ## Ausrollen der Härtung (Befund A) – Reihenfolge verbindlich
 
-1. Migration `20261102090000_web_kit_whatsapp_service_role_only` auf `qoensghjemruqafrbmjd` anwenden.
+1. Migration `20261102061405_web_kit_whatsapp_service_role_only` ist laut produktiver Migrationsliste bereits angewendet; vor Änderungen die Liste erneut prüfen. Migrationen nicht erneut ausführen.
    Ab jetzt antwortet die alte Funktion v2 mit 503 (fail-closed), es wird nichts versendet.
 2. Edge Function aus `supabase/functions/web-kit-whatsapp-send/` (index.ts **und** handler.ts) deployen, `verify_jwt` = true.
 3. `get_advisors(security)`: Die beiden Warnungen `0029` müssen verschwunden sein; `0008` (RLS ohne Policies) bleibt bewusst.
@@ -28,4 +30,4 @@ Pro Admin und Stunde höchstens zehn Versandversuche. Jeder Request erhält eine
 
 Rollback: Edge Function v2 erneut deployen **und** alte Grants wiederherstellen ist bewusst nicht vorgesehen (würde Befund A wieder öffnen). Bei Problemen bleibt der Versand fail-closed, bis v3 läuft.
 
-**Noch zu prüfen:** Browser-E2E, tatsächliche Admin-Rolle, Auth-Redirect, echte GREEN-API-Bestätigung, unabhängiges Review und produktive Pages-URL. Ohne diese Nachweise kein Merge und keine Live-Freigabe.
+**Noch zu prüfen:** tatsächliche Render-Origin, `WEB_KIT_ADMIN_ORIGIN`, Browser-E2E auf Desktop und Mobile, tatsächliche Admin-Rolle, Auth-Redirect, unabhängiges Review und Konfiguration der Edge Function aus PR #11. Ohne diese Nachweise kein Merge und keine Live-Freigabe.
