@@ -1,7 +1,5 @@
 name: Claude independent technical review (opt-in)
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -22,7 +20,7 @@ concurrency:
 jobs:
   review:
     # Disabled until the owner confirms an enforced provider-side spend cap.
-    if: ${{ vars.CLAUDE_REVIEW_ENABLED == 'true' && github.event_name == 'workflow_dispatch' }}
+    if: ${{ vars.CLAUDE_REVIEW_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
