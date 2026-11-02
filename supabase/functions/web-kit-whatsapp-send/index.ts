@@ -19,8 +19,8 @@ Deno.serve(async(req)=>{
   // Admin is granted by a trusted Auth app_metadata claim, never user_metadata.
   if(user.app_metadata?.web_kit_admin!==true)return json({error:"Admin access required"},403);
   const apiToken=Deno.env.get("GREEN_API_TOKEN");
-  const instance=Deno.env.get("GREEN_API_INSTANCE_ID");
-  const host=Deno.env.get("GREEN_API_HOST");
+  const instance=Deno.env.get("GREEN_API_INSTANCE_ID")||"710722787774";
+  const host=Deno.env.get("GREEN_API_HOST")||"https://7107.api.greenapi.com";
   if(!apiToken||!instance||!host||!/^https:\/\/[a-z0-9.-]+$/.test(host))return json({error:"Messaging not configured"},503);
   let body:unknown;
   try{body=await req.json();}catch{return json({error:"Invalid JSON"},400);}
