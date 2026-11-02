@@ -13,6 +13,15 @@ let requestKey=null;
 let approvedMessage=null;
 const endpoint=window.WEB_KIT_WHATSAPP_ENDPOINT;
 const getToken=window.WEB_KIT_GET_ACCESS_TOKEN;
+// Nach einem Fehler bleibt die Request-ID bestehen: Ein erneuter Klick löst keinen zweiten Versand aus.
+function errorText(code){
+  if(code===401)return 'Sitzung abgelaufen. Bitte neu anmelden.';
+  if(code===403)return 'Keine Berechtigung für den Versand.';
+  if(code===429)return 'Bereits gesendet oder Limit erreicht (10 pro Stunde). Nicht erneut senden.';
+  if(code===504)return 'Versandstatus unklar. Bitte zuerst in der WhatsApp-Gruppe prüfen, bevor erneut gesendet wird.';
+  if(code===502)return 'WhatsApp-Dienst hat abgelehnt. Nachricht wurde nicht gesendet.';
+  return 'Versand fehlgeschlagen (HTTP '+code+').';
+}
 message.addEventListener('input',()=>{count.textContent=String(message.value.length);send.disabled=!message.value.trim()||pending;review.hidden=true;requestKey=null;approvedMessage=null;status.textContent='';});
 form.addEventListener('submit',event=>{event.preventDefault();if(!message.value.trim()||pending)return;approvedMessage=message.value.trim();preview.textContent=approvedMessage;requestKey=crypto.randomUUID();review.hidden=false;confirm.focus();});
 cancel.addEventListener('click',()=>{review.hidden=true;approvedMessage=null;requestKey=null;send.focus();});
@@ -26,7 +35,9 @@ confirm.addEventListener('click',async()=>{
     const token=await getToken();
     if(!token)throw new Error('Bitte zuerst als Administrator anmelden.');
     const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,'apikey':'sb_publishable_Qeom38G18vSgrrE5MxoXEw_LhJM1f6S'},body:JSON.stringify({message:approvedMessage,requestKey})});
-    if(!response.ok)throw new Error('Versand fehlgeschlagen (HTTP '+response.status+').');
+    // Nur bei eindeutiger Ablehnung (502) darf ein bewusster neuer Versuch eine neue Request-ID erhalten.
+    if(response.status===502)requestKey=crypto.randomUUID();
+    if(!response.ok)throw new Error(errorText(response.status));
     status.textContent='Nachricht an Camino gesendet.';message.value='';count.textContent='0';review.hidden=true;approvedMessage=null;requestKey=null;
   }catch(error){status.textContent=error instanceof Error?error.message:'Versand fehlgeschlagen.';}
   finally{pending=false;confirm.disabled=false;send.disabled=!message.value.trim();}
