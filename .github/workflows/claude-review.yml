@@ -7,10 +7,11 @@ on:
 
 # This workflow is loaded from the trusted base branch. It never checks out or
 # executes pull-request code; the diff is fetched as untrusted text by the runner.
+# Enforcement must require the `Claude review` check from the dedicated GitHub
+# App as its expected source; a name-only status requirement is insufficient.
 permissions:
   contents: read
   pull-requests: read
-  statuses: write
 
 concurrency:
   group: claude-review-${{ github.event.pull_request.number }}
@@ -28,12 +29,23 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
 
-      - name: Review exact PR diff and publish commit status
+      - name: Create repository-scoped check-run token
+        id: review-app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.CLAUDE_REVIEW_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CLAUDE_REVIEW_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: web-kit
+          permission-checks: write
+
+      - name: Review exact PR diff
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_REVIEW_ENABLED: ${{ vars.CLAUDE_REVIEW_ENABLED }}
           CLAUDE_REVIEW_BUDGET_APPROVED: ${{ vars.CLAUDE_REVIEW_BUDGET_APPROVED }}
           GH_TOKEN: ${{ github.token }}
+          CHECKS_TOKEN: ${{ steps.review-app.outputs.token }}
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           EXPECTED_BASE: ${{ github.event.pull_request.base.sha }}

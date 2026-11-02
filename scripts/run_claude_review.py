@@ -50,17 +50,56 @@ def request_json(url: str, *, token: str, accept: str = "application/vnd.github+
     return json.loads(body)
 
 
-def post_status(token: str, repo: str, sha: str, state: str, description: str) -> None:
-    url = f"{API_ROOT}/repos/{repo}/statuses/{sha}"
-    data = json.dumps({
-        "state": state,
-        "context": "Claude review",
-        "description": description[:140],
-    }).encode("utf-8")
+def create_check_run(token: str, repo: str, sha: str, pr_number: int) -> int:
+    """Create the gate check as the dedicated GitHub App, never as Actions."""
+    url = f"{API_ROOT}/repos/{repo}/check-runs"
+    payload = {
+        "name": "Claude review",
+        "head_sha": sha,
+        "external_id": f"pull-request-{pr_number}-{sha}",
+        "status": "in_progress",
+        "output": {
+            "title": "Claude review is running",
+            "summary": "Reviewing the exact pull request HEAD.",
+        },
+    }
     request = urllib.request.Request(
         url,
-        data=data,
+        data=json.dumps(payload).encode("utf-8"),
         method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        result = json.loads(response.read(32_000))
+    check_id = result.get("id")
+    if not isinstance(check_id, int) or check_id <= 0:
+        raise ReviewError("GitHub App did not create a valid check run")
+    return check_id
+
+
+def complete_check_run(token: str, repo: str, check_id: int, conclusion: str,
+                       summary: str) -> None:
+    """Complete the App-owned check; absent or failed updates never pass."""
+    if conclusion not in {"success", "failure"}:
+        raise ValueError("invalid check conclusion")
+    url = f"{API_ROOT}/repos/{repo}/check-runs/{check_id}"
+    payload = {
+        "status": "completed",
+        "conclusion": conclusion,
+        "output": {
+            "title": "Claude review passed" if conclusion == "success" else "Claude review blocked",
+            "summary": summary,
+        },
+    }
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        method="PATCH",
         headers={
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
@@ -96,6 +135,19 @@ def fetch_pr_and_diff(repo: str, pr_number: int, token: str, expected_head: str,
     if latest.get("base", {}).get("sha") != expected_base:
         raise ReviewError("PR base changed during review")
     return pr, diff
+
+
+def ensure_revisions_current(repo: str, pr_number: int, token: str,
+                             expected_head: str, expected_base: str) -> None:
+    """Refuse PASS if either the PR revisions or main moved during inference."""
+    pr = request_json(f"{API_ROOT}/repos/{repo}/pulls/{pr_number}", token=token)
+    main_ref = request_json(f"{API_ROOT}/repos/{repo}/git/ref/heads/main", token=token)
+    if pr.get("head", {}).get("sha") != expected_head:
+        raise ReviewError("PR HEAD changed during review")
+    if pr.get("base", {}).get("sha") != expected_base:
+        raise ReviewError("PR base changed during review")
+    if main_ref.get("object", {}).get("sha") != expected_base:
+        raise ReviewError("main advanced during review")
 
 
 def read_trusted_policies() -> str:
@@ -195,24 +247,22 @@ def main() -> int:
     env = os.environ
     repo = env.get("GH_REPO", "")
     token = env.get("GH_TOKEN", "")
+    checks_token = env.get("CHECKS_TOKEN", "")
     head = env.get("EXPECTED_HEAD", "")
     base = env.get("EXPECTED_BASE", "")
     try:
         pr_number = int(env.get("PR_NUMBER", ""))
     except ValueError:
         pr_number = 0
-    if not token or not repo or not (1 <= pr_number <= 999_999_999):
+    if not token or not checks_token or not repo or not (1 <= pr_number <= 999_999_999):
         print("FAIL: invalid workflow metadata")
         return 1
 
-    status_sha = head if SHA_RE.fullmatch(head) else ""
-    scope_validated = False
     try:
         if not SHA_RE.fullmatch(head) or not SHA_RE.fullmatch(base):
             raise ReviewError("Invalid expected commit SHA")
         _, diff = fetch_pr_and_diff(repo, pr_number, token, head, base)
-        scope_validated = True
-        post_status(token, repo, head, "pending", "Claude review is running")
+        check_id = create_check_run(checks_token, repo, head, pr_number)
         if env.get("CLAUDE_REVIEW_ENABLED") != "true" or env.get("CLAUDE_REVIEW_BUDGET_APPROVED") != "true":
             raise ReviewError("Claude review is disabled or budget approval is not configured")
         api_key = env.get("ANTHROPIC_API_KEY", "")
@@ -221,18 +271,22 @@ def main() -> int:
         policies = read_trusted_policies()
         schema = json.loads(Path("scripts/claude_review.schema.json").read_text(encoding="utf-8"))
         call_claude(api_key, env.get("CLAUDE_MODEL", MODEL), head, diff, policies, schema)
-        post_status(token, repo, head, "success", "Claude returned a valid PASS for this HEAD")
+        ensure_revisions_current(repo, pr_number, token, head, base)
+        complete_check_run(
+            checks_token, repo, check_id, "success",
+            f"Valid PASS for exact HEAD {head}; no findings reported.",
+        )
         print("PASS")
         return 0
     except (ReviewError, OSError, UnicodeError, json.JSONDecodeError,
             urllib.error.URLError, TimeoutError, ValueError) as exc:
         # Never put provider output, request bodies, diffs, or credentials in logs.
         print(f"FAIL: {type(exc).__name__}")
-        if status_sha and scope_validated:
+        if "check_id" in locals():
             try:
-                post_status(token, repo, status_sha, "failure", "Claude review failed closed")
+                complete_check_run(checks_token, repo, check_id, "failure", "Review failed closed.")
             except Exception:
-                print("FAIL: unable to publish final GitHub status")
+                print("FAIL: unable to complete GitHub App check run")
         return 1
 
 

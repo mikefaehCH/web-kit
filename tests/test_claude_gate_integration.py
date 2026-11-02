@@ -65,7 +65,10 @@ class WorkflowSafetyTests(unittest.TestCase):
         self.assertNotIn("anthropics/claude-code-action", workflow)
         self.assertIn("ref: ${{ github.event.pull_request.base.sha }}", workflow)
         self.assertIn("persist-credentials: false", workflow)
-        self.assertIn("statuses: write", workflow)
+        self.assertNotIn("statuses: write", workflow)
+        self.assertIn("actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510", workflow)
+        self.assertIn("permission-checks: write", workflow)
+        self.assertNotIn('"context": "Claude review"', Path("scripts/run_claude_review.py").read_text())
         self.assertNotIn("github.event.pull_request.head.sha }}\n          persist", workflow)
 
     def test_budget_guard_fails_closed_without_running_sha_validator(self):
@@ -149,6 +152,31 @@ class ClaudeApiIntegrationTests(unittest.TestCase):
         self.assertNotIn("pattern", transformed["properties"]["reviewed_sha"])
         self.assertNotIn("minLength", transformed["properties"]["summary"])
 
+    def test_app_check_run_is_bound_to_the_exact_commit(self):
+        class FakeHTTPResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, _limit):
+                return b'{"id":73}'
+
+        def fake_urlopen(request, timeout):
+            self.assertEqual(request.full_url, "https://api.github.com/repos/owner/repo/check-runs")
+            self.assertEqual(request.get_method(), "POST")
+            self.assertEqual(request.headers["Authorization"], "Bearer app-token")
+            payload = json.loads(request.data)
+            self.assertEqual(payload["name"], "Claude review")
+            self.assertEqual(payload["head_sha"], SHA)
+            self.assertEqual(payload["status"], "in_progress")
+            self.assertEqual(timeout, 20)
+            return FakeHTTPResponse()
+
+        with patch("scripts.run_claude_review.urllib.request.urlopen", fake_urlopen):
+            self.assertEqual(run_claude_review.create_check_run("app-token", "owner/repo", SHA, 4), 73)
+
     def test_provider_timeout_is_a_hard_failure(self):
         schema = json.loads(Path("scripts/claude_review.schema.json").read_text())
         with patch("scripts.run_claude_review.urllib.request.urlopen", side_effect=TimeoutError()):
@@ -181,6 +209,7 @@ class ClaudeApiIntegrationTests(unittest.TestCase):
         env = {
             "GH_REPO": "owner/repo",
             "GH_TOKEN": "test-token",
+            "CHECKS_TOKEN": "app-check-token",
             "PR_NUMBER": "4",
             "EXPECTED_BASE": "b" * 40,
             "EXPECTED_HEAD": SHA,
@@ -194,41 +223,64 @@ class ClaudeApiIntegrationTests(unittest.TestCase):
             patch("scripts.run_claude_review.fetch_pr_and_diff", return_value=({}, "diff")),
             patch("scripts.run_claude_review.read_trusted_policies", return_value="rules"),
             patch("scripts.run_claude_review.call_claude") as call_claude,
-            patch("scripts.run_claude_review.post_status") as post_status,
+            patch("scripts.run_claude_review.ensure_revisions_current") as ensure_current,
+            patch("scripts.run_claude_review.create_check_run", return_value=41) as create_check,
+            patch("scripts.run_claude_review.complete_check_run") as complete_check,
         ):
             if isinstance(review_side_effect, Exception):
                 call_claude.side_effect = review_side_effect
             else:
                 call_claude.return_value = review_side_effect
             code = run_claude_review.main()
-        return code, call_claude, post_status
+        if enabled == "true" and budget == "true" and review_side_effect == pass_payload():
+            ensure_current.assert_called_once()
+            complete_check.assert_called_once_with(
+                "app-check-token", "owner/repo", 41, "success",
+                f"Valid PASS for exact HEAD {SHA}; no findings reported.",
+            )
+        else:
+            ensure_current.assert_not_called()
+            complete_check.assert_called_once_with(
+                "app-check-token", "owner/repo", 41, "failure", "Review failed closed."
+            )
+        create_check.assert_called_once_with("app-check-token", "owner/repo", SHA, 4)
+        return code, call_claude
 
-    def test_gate_publishes_success_only_for_validated_pass(self):
-        code, call_claude, post_status = self.run_gate("true", "true", pass_payload())
+    def test_gate_succeeds_only_for_validated_pass_and_current_revisions(self):
+        code, call_claude = self.run_gate("true", "true", pass_payload())
         self.assertEqual(code, 0)
         call_claude.assert_called_once()
-        self.assertEqual(
-            [call.args[3] for call in post_status.call_args_list],
-            ["pending", "success"],
-        )
 
     def test_gate_blocks_disabled_budget_and_model_failures(self):
-        code, call_claude, post_status = self.run_gate("false", "true", pass_payload())
+        code, call_claude = self.run_gate("false", "true", pass_payload())
         self.assertEqual(code, 1)
         call_claude.assert_not_called()
-        self.assertEqual(
-            [call.args[3] for call in post_status.call_args_list],
-            ["pending", "failure"],
-        )
 
-        code, call_claude, post_status = self.run_gate(
+        code, call_claude = self.run_gate(
             "true", "true", run_claude_review.ReviewError("simulated API failure")
         )
         self.assertEqual(code, 1)
         call_claude.assert_called_once()
-        self.assertEqual(
-            [call.args[3] for call in post_status.call_args_list],
-            ["pending", "failure"],
+
+    def test_main_moving_during_model_call_blocks_success(self):
+        with (
+            patch.dict("os.environ", {
+                "GH_REPO": "owner/repo", "GH_TOKEN": "test-token", "PR_NUMBER": "4",
+                "CHECKS_TOKEN": "app-check-token",
+                "EXPECTED_BASE": "b" * 40, "EXPECTED_HEAD": SHA,
+                "CLAUDE_REVIEW_ENABLED": "true", "CLAUDE_REVIEW_BUDGET_APPROVED": "true",
+                "ANTHROPIC_API_KEY": "test-key", "CLAUDE_MODEL": "test-model",
+            }, clear=True),
+            patch("scripts.run_claude_review.fetch_pr_and_diff", return_value=({}, "diff")),
+            patch("scripts.run_claude_review.read_trusted_policies", return_value="rules"),
+            patch("scripts.run_claude_review.call_claude", return_value=pass_payload()),
+            patch("scripts.run_claude_review.ensure_revisions_current", side_effect=run_claude_review.ReviewError("main moved")),
+            patch("scripts.run_claude_review.create_check_run", return_value=41),
+            patch("scripts.run_claude_review.complete_check_run") as complete_check,
+        ):
+            self.assertEqual(run_claude_review.main(), 1)
+        complete_check.assert_called_once_with(
+            "app-check-token", "owner/repo", 41, "failure", "Review failed closed."
         )
 
 if __name__ == "__main__":
