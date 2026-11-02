@@ -17,7 +17,7 @@ console.log('WhatsApp static checks passed');
 
 assert.match(html,/id="login-panel"/);
 assert.match(html,/id="workspace" hidden/);
-assert.match(css,/\[hidden\]\{display:none!important\}/);
+assert.ok(css.includes("[hidden]{display:none!important}"));
 assert.match(auth,/shouldCreateUser:false/);
 assert.match(auth,/app_metadata\?\.web_kit_admin/);
 assert.match(js,/approvedMessage/);
