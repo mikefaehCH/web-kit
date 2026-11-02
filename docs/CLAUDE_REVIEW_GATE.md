@@ -39,7 +39,7 @@ Status: **nicht produktiv aktiviert**. Die Workflow-Implementierung, grüne CI o
 - Der aktive Ruleset `Protect main` muss alle bestehenden CI-Pflichtchecks sowie `Claude review` mit exakt dieser App als Quelle erfordern. «Require branches to be up to date» muss an sein; es gibt keine Bypass-Akteure. Im Solo-Maintainer-Modell ist die erforderliche Approval-Anzahl null.
 - Ein verifiziertes Anthropic-Workspace-Ausgabenlimit von höchstens USD 10 pro Monat ist unabhängig vom Workflow-Opt-in erforderlich (Betreiberangabe vom 2026-11-02, nicht unabhängig verifiziert: Workspace-Limit USD 10, Organisationslimit USD 20). Jeder neue Review-Fingerprint kann einen kostenpflichtigen Aufruf auslösen; derselbe Fingerprint auf derselben Basis wird nicht erneut bewertet.
 
-Letzter ausgelesener Ruleset-Stand (Angabe des Implementierers vom 2026-11-02; im Claude-Review nicht erneut auslesbar, da kein API-Zugriff): `Protect main` ist aktiv, verlangt null Approvals und weiterhin `repository`, `static-check`, `edge-function` und `database`; die Basis-Aktualität ist **nicht** strikt erzwungen. `require_last_push_approval` ist aktiv. `Claude review` ist nicht erforderlich. Damit ist das Gate weiterhin **nicht verbindlich**.
+Zuletzt per GitHub-API am 2026-11-02 geprüft: `Protect main` ist aktiv, verlangt null Approvals und die Checks `repository`, `static-check`, `edge-function` und `database`; die Basis-Aktualität ist nicht strikt erzwungen. `require_last_push_approval` und `require_extra_approval_for_unattributed_changes` sind deaktiviert. `Claude review` ist nicht erforderlich. Damit ist das Gate weiterhin **nicht verbindlich**.
 
 ## Nachweise und Grenzen
 
