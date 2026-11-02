@@ -5,6 +5,7 @@ The provider is replaced by a local fake; no network access and no paid call.
 
 import base64
 import contextlib
+import http.client
 import io
 import json
 import os
@@ -491,6 +492,99 @@ class LedgerGateTests(unittest.TestCase):
         ):
             self.assertEqual(rcr.main(), 1)
         self.assertEqual(self.ledger_states(), [("completed", "neutral")])
+
+    # --- real send_to_claude: errors before vs. after a successful response -----
+    def run_with_urlopen(self, urlopen):
+        pr = self.gh.prs[4]
+        env = {
+            "GH_REPO": "owner/repo", "GH_TOKEN": "t", "CHECKS_TOKEN": "a", "CLAUDE_REVIEW_APP_ID": str(APP_ID),
+            "PR_NUMBER": "4", "EXPECTED_HEAD": pr["head"], "EXPECTED_BASE": pr["base"],
+            "CLAUDE_REVIEW_ENABLED": "true", "CLAUDE_REVIEW_BUDGET_APPROVED": "true",
+            "ANTHROPIC_API_KEY": "k",
+        }
+        with (
+            patch.dict(os.environ, env, clear=True),
+            patch.object(rcr, "request_json", self.gh.request_json),
+            patch.object(rcr, "send_json", self.gh.send_json),
+            patch.object(rcr, "read_trusted_policies", return_value="rules"),
+            patch("scripts.run_claude_review.urllib.request.urlopen", urlopen),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            return rcr.main()
+
+    class Opener:
+        """urlopen stand-in: each call consumes one scripted outcome."""
+
+        def __init__(self, *outcomes):
+            self.outcomes = list(outcomes)
+            self.calls = 0
+
+        def __call__(self, request, timeout=None):
+            self.calls += 1
+            outcome = self.outcomes.pop(0)
+            if isinstance(outcome, BaseException):
+                raise outcome  # failure before any successful response
+            return outcome
+
+    class Response:
+        def __init__(self, body=b"", read_error=None):
+            self.body = body
+            self.read_error = read_error
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self, limit=None):
+            if self.read_error is not None:
+                raise self.read_error
+            return self.body if limit is None else self.body[:limit]
+
+    def test_failures_before_a_successful_response_stay_retryable(self):
+        before = (
+            urllib.error.URLError("connection refused"),
+            TimeoutError("connect timed out"),
+            urllib.error.HTTPError("https://api.anthropic.com", 529, "overloaded", {}, None),
+        )
+        for error in before:
+            with self.subTest(error=repr(error)):
+                self.setUp()
+                opener = self.Opener(error, self.Response(verdict_for(HEAD_A)))
+                self.assertEqual(self.run_with_urlopen(opener), 1)
+                self.assertEqual(self.ledger_states(), [("completed", "neutral")])
+                self.assertIn("retry is allowed", self.gh.pr_check(4)["output"]["summary"])
+                self.assertEqual(self.run_with_urlopen(opener), 0)
+                self.assertEqual(opener.calls, 2)
+
+    def test_read_failures_after_successful_response_are_sticky(self):
+        during = (
+            http.client.IncompleteRead(b'{"stop_reason":"end_turn","content":[', 5000),
+            http.client.IncompleteRead(b"", None),
+            TimeoutError("read timed out"),
+        )
+        for error in during:
+            with self.subTest(error=repr(error)):
+                self.setUp()
+                opener = self.Opener(self.Response(read_error=error), self.Response(verdict_for(HEAD_A)))
+                self.assertEqual(self.run_with_urlopen(opener), 1)
+                self.assertEqual(self.ledger_states(), [("completed", "failure")])
+                summary = self.gh.pr_check(4)["output"]["summary"]
+                self.assertNotIn("retry is allowed", summary)
+                self.assertIn("recorded as non-passing", summary)
+                # Second run: blocked by the ledger, no further model request.
+                self.assertEqual(self.run_with_urlopen(opener), 1)
+                self.assertEqual(opener.calls, 1)
+                self.assertEqual(self.gh.pr_check(4)["conclusion"], "failure")
+
+    def test_oversized_body_via_real_read_stays_sticky(self):
+        oversized = verdict_for(HEAD_A) + b" " * (rcr.MAX_PROVIDER_RESPONSE_BYTES * 2)
+        opener = self.Opener(self.Response(oversized), self.Response(verdict_for(HEAD_A)))
+        self.assertEqual(self.run_with_urlopen(opener), 1)
+        self.assertEqual(self.ledger_states(), [("completed", "failure")])
+        self.assertEqual(self.run_with_urlopen(opener), 1)
+        self.assertEqual(opener.calls, 1)
 
     def test_exception_after_model_call_started_is_sticky(self):
         provider = Provider(verdict_for(HEAD_A))

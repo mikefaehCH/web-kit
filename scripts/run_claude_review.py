@@ -492,7 +492,17 @@ def build_claude_payload(model: str, reviewed_sha: str, review_context: str,
 
 
 def send_to_claude(api_key: str, payload: dict[str, Any]) -> bytes:
-    """Send the request; any failure before a 2xx body is a transport failure."""
+    """Send the request and read the body, separating two failure classes.
+
+    - Before a successful response exists (connection, TLS, timeout while
+      waiting, HTTP error status): ProviderTransportError, retryable. No model
+      output can have been delivered.
+    - Once ``urlopen`` returned a successful response, any failure while
+      reading or closing its body (IncompleteRead, read timeout, reset, unknown
+      length) is a ProviderResponseError and therefore a sticky non-pass,
+      even with partial bytes, because the model may already have produced
+      a verdict for this fingerprint.
+    """
     request = urllib.request.Request(
         ANTHROPIC_MESSAGES,
         data=json.dumps(payload).encode("utf-8"),
@@ -504,15 +514,23 @@ def send_to_claude(api_key: str, payload: dict[str, Any]) -> bytes:
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=150) as response:
-            # One byte beyond the limit lets the parser detect an oversized body
-            # instead of silently truncating it.
-            return response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
+        response = urllib.request.urlopen(request, timeout=150)
     except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as exc:
         # urllib.error.HTTPError is a URLError: an HTTP error status carries no
-        # model output, so it is treated as retryable transport failure. The same
-        # applies to a connection that breaks before a complete body was read.
+        # model output, so it is treated as retryable transport failure.
         raise ProviderTransportError("Claude API request failed or timed out") from exc
+    try:
+        with response:
+            # One byte beyond the limit lets the parser detect an oversized body
+            # instead of silently truncating it.
+            body = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
+    except Exception as exc:
+        raise ProviderResponseError(
+            "Claude API response body could not be read completely"
+        ) from exc
+    if not isinstance(body, (bytes, bytearray)):
+        raise ProviderResponseError("Claude API response body has an unexpected type")
+    return bytes(body)
 
 
 def parse_provider_response(body: bytes) -> Any:
@@ -756,8 +774,13 @@ def main() -> int:
         payload = build_claude_payload(env.get("CLAUDE_MODEL", MODEL), head, review_context,
                                        policies, schema)
         model_call_started = True
+        body: bytes | None = None
         try:
             body = send_to_claude(api_key, payload)
+        except ProviderResponseError:
+            # A successful response started but its body could not be read:
+            # sticky non-pass, handled together with unusable bodies below.
+            body = None
         except ProviderTransportError:
             finalize_ledger(checks_token, repo, claim_id, "neutral")
             claim_final = True
@@ -768,10 +791,12 @@ def main() -> int:
             print("FAIL: provider transport failure (retryable)")
             return 1
 
-        try:
-            result = parse_provider_response(body)
-        except ProviderResponseError:
-            result = None
+        result = None
+        if body is not None:
+            try:
+                result = parse_provider_response(body)
+            except ProviderResponseError:
+                result = None
         if result is None or not validate(result, head):
             finalize_ledger(checks_token, repo, claim_id, "failure")
             claim_final = True

@@ -256,6 +256,37 @@ class ProviderClassificationTests(unittest.TestCase):
                     with self.assertRaises(run_claude_review.ProviderTransportError):
                         run_claude_review.send_to_claude("key", {"model": "m"})
 
+    def test_body_read_failures_after_successful_response_are_response_errors(self):
+        class FailingRead(FakeHTTPResponse):
+            def __init__(self, error):
+                super().__init__(b"")
+                self.error = error
+
+            def read(self, limit=None):
+                raise self.error
+
+        class FailingClose(FakeHTTPResponse):
+            def __exit__(self, *args):
+                raise ConnectionResetError("reset while closing")
+
+        errors = (
+            http.client.IncompleteRead(b'{"stop_reason":"end_turn","content":[{"type":"text"', 4000),
+            http.client.IncompleteRead(b"", None),  # unknown remaining length
+            TimeoutError("read timed out"),
+            ConnectionResetError("reset during read"),
+            OSError("socket error during read"),
+        )
+        for error in errors:
+            with self.subTest(error=repr(error)), patch(
+                "scripts.run_claude_review.urllib.request.urlopen", return_value=FailingRead(error)
+            ):
+                with self.assertRaises(run_claude_review.ProviderResponseError):
+                    run_claude_review.send_to_claude("key", {"model": "m"})
+        with patch("scripts.run_claude_review.urllib.request.urlopen",
+                   return_value=FailingClose(provider_body(pass_payload()))):
+            with self.assertRaises(run_claude_review.ProviderResponseError):
+                run_claude_review.send_to_claude("key", {"model": "m"})
+
     def test_transport_and_response_errors_are_distinct_review_errors(self):
         self.assertTrue(issubclass(run_claude_review.ProviderTransportError, run_claude_review.ReviewError))
         self.assertTrue(issubclass(run_claude_review.ProviderResponseError, run_claude_review.ReviewError))
