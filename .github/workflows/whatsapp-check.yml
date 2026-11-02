@@ -2,7 +2,7 @@ name: WhatsApp admin checks
 on:
   pull_request:
   push:
-    branches: [feat/admin-whatsapp-composer]
+    branches: [main, feat/admin-whatsapp-composer]
 permissions:
   contents: read
 jobs:
