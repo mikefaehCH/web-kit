@@ -28,7 +28,10 @@ jobs:
             ' pr.json >/dev/null || continue
             # Only README.md edits may merge with scaffold-only checks (AGENTS.md, RELEASE_POLICY.md §7).
             # Rule files (AGENTS.md, RELEASE_POLICY.md) and everything else need independent review.
-            changed=$(gh api --paginate "repos/$GH_REPO/pulls/$pr/files?per_page=100" --jq '.[].filename')
+            # Renames/removals are never README-only: a rename AGENTS.md -> README.md would otherwise delete
+            # a rule file while the files API only reports the new name. Also emit previous_filename.
+            changed=$(gh api --paginate "repos/$GH_REPO/pulls/$pr/files?per_page=100" \
+              --jq '.[] | (if (.status=="modified" or .status=="added") then .filename else "DISALLOWED:\(.status):\(.filename)" end), (.previous_filename // empty)')
             if [ -z "$changed" ] || echo "$changed" | grep -Ev '^README\.md$' >/dev/null; then
               echo "Not README-only; independent review required."
               continue
