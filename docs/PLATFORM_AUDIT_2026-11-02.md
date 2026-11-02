@@ -44,8 +44,8 @@ Monorepo nicht erzwingen. Keine duplizierte `site.json`-Wahrheit und keine gemei
 Benötigt Node 20+, keine zusätzlichen npm-Pakete:
 
 ```sh
-npm test
-npm run inventory -- reports/baseline.json reports/baseline.md
+node --test tests/inventory.test.mjs
+node scripts/inventory.mjs reports/baseline.json reports/baseline.md
 ```
 
 Optional `GITHUB_TOKEN` als sichere Umgebungsvariable für höhere GitHub-API-Ratenlimits setzen. Ohne Token sind nur öffentliche Daten abrufbar. Bestehende Report-Dateien werden nicht überschrieben. Trunkierte Git-Trees führen zu einem Fehler, nicht zu geschätzten Ergebnissen.
