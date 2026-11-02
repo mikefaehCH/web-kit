@@ -17,6 +17,22 @@ Dieses Dokument trennt bestätigte Fakten, offene Abnahmen und technische Entsch
 
 GitHub-Repositorygrössen sind **keine** Codezeilen. Das Inventarwerkzeug erhebt getrackte Dateien, Quelltext- und Asset-Grössen, Tests/Workflows und PR-Status direkt aus API-Metadaten. Es schätzt keine LOC und prüft keine Live-Datenbanken.
 
+## Tatsächlich gemessene API-Baseline (02.11.2026, 07:59:36 UTC)
+
+Die read-only GitHub-Actions-Ausführung [Platform inventory tests #41409829891](https://github.com/mikefaehCH/web-kit/actions/runs/41409829891) hat den Standardbranch jedes Repositories erfolgreich inventarisiert. Diese Werte **enthalten keine Dateien aus offenen PR-Branches**.
+
+| Repository | Getrackte Dateien | Quelltextklassifikation* | Assets | Testdateien | Workflows | PRs total | PRs offen |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| web-kit | 26 | 19 | 0 | 6 | 3 | 10 | 7 |
+| camino | 168 | 24 | 123 | 9 | 1 | 33 | 2 |
+| Sommer2027 | 120 | 82 | 20 | 13 | 2 | 46 | 7 |
+| zuerich | 61 | 13 | 40 | 2 | 1 | 5 | 2 |
+| Valencia | 1 | 1 | 0 | 0 | 0 | 2 | 2 |
+| edinburgh | 1 | 1 | 0 | 0 | 0 | 1 | 1 |
+| **Total** | **377** | **140** | **183** | **30** | **7** | **97** | **21** |
+
+*Quelltextklassifikation beruht auf Dateiendungen und zählt auch JSON, YAML und SVG. Testdateien/Workflows sind zusätzliche, überlappende Kategorien und dürfen nicht zu den 377 Dateien addiert werden. Dies ist ein **strukturelles Inventar**, keine Aussage über tatsächliche Codezeilen, Sicherheitsqualität, Testabdeckung oder Fertigstellungsgrad.
+
 ## Bereits laufende Arbeiten – nicht doppelt implementieren
 
 - [Sommer2027 PR #47](https://github.com/mikefaehCH/Sommer2027/pull/47) enthält bereits `site.json` v2, Kategorie-Registry, Wizard, Generator, ZIP und Tests. Nur nach aktuellem HEAD-Review und regelkonformem Merge als kanonische Quelle nach `web-kit` integrieren. Details: [Issue #45](https://github.com/mikefaehCH/Sommer2027/issues/45).
