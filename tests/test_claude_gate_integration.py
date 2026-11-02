@@ -215,6 +215,33 @@ class ProviderClassificationTests(unittest.TestCase):
                 with self.assertRaises(run_claude_review.ProviderResponseError):
                     run_claude_review.parse_provider_response(body)
 
+    def test_provider_body_size_limit_is_inclusive_and_never_truncated(self):
+        limit = run_claude_review.MAX_PROVIDER_RESPONSE_BYTES
+        body = provider_body(pass_payload())
+        at_limit = body + b" " * (limit - len(body))
+        self.assertEqual(len(at_limit), limit)
+        self.assertEqual(run_claude_review.parse_provider_response(at_limit)["verdict"], "PASS")
+        with self.assertRaisesRegex(run_claude_review.ProviderResponseError, "exceeds"):
+            run_claude_review.parse_provider_response(at_limit + b" ")
+        with self.assertRaises(run_claude_review.ProviderResponseError):
+            run_claude_review.parse_provider_response("not bytes")
+
+    def test_send_reads_one_byte_beyond_the_limit(self):
+        limit = run_claude_review.MAX_PROVIDER_RESPONSE_BYTES
+        reads = []
+
+        class Huge(FakeHTTPResponse):
+            def read(self, size=None):
+                reads.append(size)
+                return b"x" * size
+
+        with patch("scripts.run_claude_review.urllib.request.urlopen", return_value=Huge(b"")):
+            body = run_claude_review.send_to_claude("key", {"model": "m"})
+        self.assertEqual(reads, [limit + 1])
+        self.assertEqual(len(body), limit + 1)
+        with self.assertRaises(run_claude_review.ProviderResponseError):
+            run_claude_review.parse_provider_response(body)
+
     def test_transport_failures_without_response_are_retryable_class(self):
         errors = (
             urllib.error.URLError("dns"),

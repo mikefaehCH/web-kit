@@ -44,6 +44,8 @@ class FakeGitHub:
         self.hide_ledger = False
         self.before_ledger_post = None
         self.after_ledger_post = None
+        self.after_ledger_patch = None
+        self.fail_ledger_list = False
         self.request_count = 0
 
     def add_pr(self, number, head, files=FILES, content=CONTENT, base=BASE):
@@ -101,6 +103,8 @@ class FakeGitHub:
             page = int(query.get("page", ["1"])[0])
             runs = [dict(run) for run in self.runs.values()
                     if run["head_sha"] == parts[1] and (name is None or run["name"] == name)]
+            if name == rcr.LEDGER_CHECK_NAME and self.fail_ledger_list:
+                raise urllib.error.URLError("ledger listing unavailable")
             if self.hide_ledger:
                 runs = [run for run in runs if run["name"] != rcr.LEDGER_CHECK_NAME]
             return {"check_runs": runs[(page - 1) * 100: page * 100]}
@@ -128,6 +132,8 @@ class FakeGitHub:
             if run["name"] == rcr.LEDGER_CHECK_NAME and self.fail_ledger_patch:
                 raise urllib.error.URLError("ledger update failed")
             run.update(status=payload["status"], conclusion=payload["conclusion"], output=payload["output"])
+            if run["name"] == rcr.LEDGER_CHECK_NAME and self.after_ledger_patch:
+                self.after_ledger_patch(dict(run))
             return dict(run)
         raise AssertionError(f"unexpected {method} {url}")
 
@@ -282,14 +288,142 @@ class LedgerGateTests(unittest.TestCase):
         self.assertEqual((own["status"], own["conclusion"]), ("completed", "neutral"))
         self.assertIn("takes precedence", self.gh.pr_check(4)["output"]["summary"])
 
-    def test_later_competing_claim_does_not_block_the_winner(self):
+    def test_later_competing_claim_wins_no_verdict_and_blocks_pr_pass_until_resolved(self):
+        later = {}
+
         def later_claim(payload):
-            self.gh.insert_run(rcr.LEDGER_CHECK_NAME, BASE, payload["external_id"], "in_progress")
+            later["id"] = self.gh.insert_run(rcr.LEDGER_CHECK_NAME, BASE, payload["external_id"], "in_progress")
 
         self.gh.after_ledger_post = later_claim
         provider = Provider(verdict_for(HEAD_A))
+        # The earlier claim still wins arbitration and records the first verdict ...
+        self.assertEqual(self.run_gate(4, provider), 1)
+        self.assertEqual(provider.calls, 1)
+        own = min(self.gh.ledger(), key=lambda run: run["id"])
+        self.assertEqual((own["status"], own["conclusion"]), ("completed", "success"))
+        # ... but the unresolved later claim keeps the PR check fail-closed.
+        self.assertEqual(self.gh.pr_check(4)["conclusion"], "failure")
+        self.gh.after_ledger_post = None
+        self.gh.runs[later["id"]].update(status="completed", conclusion="neutral")
         self.assertEqual(self.run_gate(4, provider), 0)
         self.assertEqual(provider.calls, 1)
+
+    # --- final recheck immediately before a PR PASS ---------------------------
+    def test_entry_added_after_pass_finalization_prevents_pr_pass(self):
+        for status, conclusion in (("completed", "failure"), ("completed", "stale"),
+                                   ("in_progress", None), ("queued", None),
+                                   ("completed", "success")):
+            with self.subTest(status=status, conclusion=conclusion):
+                self.setUp()
+
+                def inject(run, status=status, conclusion=conclusion):
+                    if run["conclusion"] == "success":
+                        self.gh.after_ledger_patch = None
+                        self.gh.insert_run(rcr.LEDGER_CHECK_NAME, BASE, run["external_id"], status, conclusion)
+
+                self.gh.after_ledger_patch = inject
+                provider = Provider(verdict_for(HEAD_A))
+                self.assertEqual(self.run_gate(4, provider), 1)
+                self.assertEqual(self.gh.pr_check(4)["conclusion"], "failure")
+                self.assertNotEqual(self.gh.pr_check(4)["conclusion"], "success")
+
+    def test_unavailable_ledger_recheck_never_produces_pr_pass(self):
+        def break_listing(run):
+            if run["conclusion"] == "success":
+                self.gh.fail_ledger_list = True
+
+        self.gh.after_ledger_patch = break_listing
+        self.assertEqual(self.run_gate(4, Provider(verdict_for(HEAD_A))), 1)
+        self.assertEqual(self.gh.pr_check(4)["conclusion"], "failure")
+
+    def test_revisions_moving_after_ledger_recheck_prevent_pr_pass(self):
+        for moved in ("main", "head", "base"):
+            with self.subTest(moved=moved):
+                self.setUp()
+
+                def move(run, moved=moved):
+                    if run["conclusion"] != "success":
+                        return
+                    if moved == "main":
+                        self.gh.main = HEAD_C
+                    elif moved == "head":
+                        self.gh.prs[4]["head"] = HEAD_C
+                    else:
+                        self.gh.prs[4]["base"] = HEAD_C
+
+                self.gh.after_ledger_patch = move
+                self.assertEqual(self.run_gate(4, Provider(verdict_for(HEAD_A))), 1)
+                checks = self.gh.runs_named(rcr.PR_CHECK_NAME, HEAD_A)
+                self.assertEqual([run["conclusion"] for run in checks], ["failure"])
+
+    def test_reused_pass_is_rejected_when_ledger_gains_another_entry(self):
+        provider = Provider(verdict_for(HEAD_A))
+        self.assertEqual(self.run_gate(4, provider), 0)
+        external_id = rcr.ledger_external_id(self.fingerprint(4))
+        self.gh.add_pr(5, HEAD_B)
+        for status, conclusion in (("in_progress", None), ("completed", "success")):
+            with self.subTest(status=status, conclusion=conclusion):
+                run_id = self.gh.insert_run(rcr.LEDGER_CHECK_NAME, BASE, external_id, status, conclusion)
+                self.assertEqual(self.run_gate(5, provider), 1)
+                self.assertEqual(self.gh.pr_check(5)["conclusion"], "failure")
+                del self.gh.runs[run_id]
+        self.assertEqual(self.run_gate(5, provider), 0)
+        self.assertEqual(provider.calls, 1)
+
+    # --- provider response size --------------------------------------------------
+    def padded_body(self, size, head=HEAD_A):
+        body = verdict_for(head)
+        self.assertLessEqual(len(body), size)
+        return body + b" " * (size - len(body))  # valid JSON with trailing whitespace
+
+    def test_response_exactly_at_limit_is_accepted(self):
+        body = self.padded_body(rcr.MAX_PROVIDER_RESPONSE_BYTES)
+        self.assertEqual(self.run_gate(4, Provider(body)), 0)
+        self.assertEqual(self.ledger_states(), [("completed", "success")])
+
+    def test_response_over_limit_is_a_sticky_non_pass(self):
+        body = self.padded_body(rcr.MAX_PROVIDER_RESPONSE_BYTES + 1)
+        provider = Provider(body, verdict_for(HEAD_A))
+        self.assertEqual(self.run_gate(4, provider), 1)
+        self.assertEqual(self.ledger_states(), [("completed", "failure")])
+        self.assertNotIn("retry is allowed", self.gh.pr_check(4)["output"]["summary"])
+        self.assertEqual(self.run_gate(4, provider), 1)
+        self.assertEqual(provider.calls, 1)
+
+    def test_real_read_detects_oversized_body_and_blocks(self):
+        oversized = self.padded_body(rcr.MAX_PROVIDER_RESPONSE_BYTES * 2)
+        reads = []
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, limit=None):
+                reads.append(limit)
+                return oversized if limit is None else oversized[:limit]
+
+        pr = self.gh.prs[4]
+        env = {
+            "GH_REPO": "owner/repo", "GH_TOKEN": "t", "CHECKS_TOKEN": "a", "CLAUDE_REVIEW_APP_ID": str(APP_ID),
+            "PR_NUMBER": "4", "EXPECTED_HEAD": pr["head"], "EXPECTED_BASE": pr["base"],
+            "CLAUDE_REVIEW_ENABLED": "true", "CLAUDE_REVIEW_BUDGET_APPROVED": "true",
+            "ANTHROPIC_API_KEY": "k",
+        }
+        with (
+            patch.dict(os.environ, env, clear=True),
+            patch.object(rcr, "request_json", self.gh.request_json),
+            patch.object(rcr, "send_json", self.gh.send_json),
+            patch.object(rcr, "read_trusted_policies", return_value="rules"),
+            patch("scripts.run_claude_review.urllib.request.urlopen", return_value=Response()),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(rcr.main(), 1)
+        self.assertEqual(reads, [rcr.MAX_PROVIDER_RESPONSE_BYTES + 1])
+        self.assertEqual(self.ledger_states(), [("completed", "failure")])
+        self.assertEqual(self.gh.pr_check(4)["conclusion"], "failure")
 
     def test_failure_recorded_during_evaluation_prevents_pass(self):
         def evaluation(payload):

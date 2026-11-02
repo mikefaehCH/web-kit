@@ -505,7 +505,9 @@ def send_to_claude(api_key: str, payload: dict[str, Any]) -> bytes:
     )
     try:
         with urllib.request.urlopen(request, timeout=150) as response:
-            return response.read(MAX_PROVIDER_RESPONSE_BYTES)
+            # One byte beyond the limit lets the parser detect an oversized body
+            # instead of silently truncating it.
+            return response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
     except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as exc:
         # urllib.error.HTTPError is a URLError: an HTTP error status carries no
         # model output, so it is treated as retryable transport failure. The same
@@ -515,6 +517,12 @@ def send_to_claude(api_key: str, payload: dict[str, Any]) -> bytes:
 
 def parse_provider_response(body: bytes) -> Any:
     """Parse a received provider body; every malformed shape is a sticky non-pass."""
+    if not isinstance(body, (bytes, bytearray)):
+        raise ProviderResponseError("Claude API response body has an unexpected type")
+    if len(body) > MAX_PROVIDER_RESPONSE_BYTES:
+        # Never parse a possibly truncated body; it was received, so it is not
+        # a retryable transport failure.
+        raise ProviderResponseError("Claude API response exceeds the configured limit")
     try:
         response = json.loads(body)
     except (ValueError, UnicodeDecodeError) as exc:
@@ -618,13 +626,36 @@ def safe_failure_summary(result: Any, allowed_paths: frozenset[str] = frozenset(
 
 # --------------------------------------------------------------------------- main
 
+def confirm_single_pass(token: str, repo: str, base_sha: str, fingerprint: str,
+                        expected_app_id: int, expected_pass_id: int | None = None) -> None:
+    """Final ledger gate immediately before any PR success.
+
+    Proceeds only if the ledger holds exactly one completed PASS (and, for a
+    fresh verdict, it is this run's own entry) and nothing else except released
+    (neutral) claims. Any failure, unknown state or unresolved claim raises.
+    """
+    entries = list_ledger_entries(token, repo, base_sha, fingerprint, expected_app_id)
+    pass_ids: list[int] = []
+    for entry in entries:
+        if entry.get("status") != "completed":
+            raise ReviewError("An unresolved ledger claim exists for this fingerprint")
+        conclusion = entry.get("conclusion")
+        if conclusion == "success":
+            pass_ids.append(entry["id"])
+        elif conclusion != "neutral":
+            raise ReviewError("A non-passing or unknown ledger entry exists for this fingerprint")
+    if len(pass_ids) != 1:
+        raise ReviewError("Ledger does not hold exactly one valid PASS")
+    if expected_pass_id is not None and pass_ids[0] != expected_pass_id:
+        raise ReviewError("Ledger PASS does not belong to this evaluation")
+
+
 def reuse_pass(repo: str, pr_number: int, token: str, checks_token: str, head: str,
                base: str, fingerprint: str, expected_app_id: int, check_id: int) -> int:
     """Reuse a first PASS for the identical fingerprint after rechecking everything."""
+    # Ledger first, revisions last: both are rechecked immediately before success.
+    confirm_single_pass(checks_token, repo, base, fingerprint, expected_app_id)
     ensure_revisions_current(repo, pr_number, token, head, base)
-    entries = list_ledger_entries(checks_token, repo, base, fingerprint, expected_app_id)
-    if ledger_decision(entries) != LEDGER_PASS:
-        raise ReviewError("Ledger no longer holds a reusable PASS")
     complete_check_run(
         checks_token, repo, check_id, "success",
         f"First PASS for the identical review fingerprint reused at HEAD {head}; "
@@ -754,12 +785,21 @@ def main() -> int:
 
         # Valid PASS: recheck the ledger before recording it as the first verdict.
         entries = list_ledger_entries(checks_token, repo, base, fingerprint, expected_app_id)
-        if ledger_decision(entries, exclude_id=claim_id, before_id=claim_id) not in {
-            LEDGER_OPEN, LEDGER_PASS,
-        }:
+        decision = ledger_decision(entries, exclude_id=claim_id, before_id=claim_id)
+        if decision == LEDGER_PASS:
+            # An identical PASS already exists; keep exactly one PASS entry.
+            finalize_ledger(checks_token, repo, claim_id, "neutral")
+            claim_final = True
+            return reuse_pass(repo, pr_number, token, checks_token, head, base,
+                              fingerprint, expected_app_id, check_id)
+        if decision != LEDGER_OPEN:
             raise ReviewError("Another verdict for this fingerprint takes precedence")
         finalize_ledger(checks_token, repo, claim_id, "success")
         claim_final = True
+        # Final gate immediately before the PR PASS: ledger, then revisions.
+        # Any failure here leaves the PR check as failure via the handler below.
+        confirm_single_pass(checks_token, repo, base, fingerprint, expected_app_id,
+                            expected_pass_id=claim_id)
         ensure_revisions_current(repo, pr_number, token, head, base)
         complete_check_run(
             checks_token, repo, check_id, "success",
