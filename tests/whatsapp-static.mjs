@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const html=readFileSync(new URL('../admin/whatsapp.html',import.meta.url),'utf8');
+const js=readFileSync(new URL('../admin/whatsapp.js',import.meta.url),'utf8');
+const edge=readFileSync(new URL('../supabase/functions/web-kit-whatsapp-send/index.ts',import.meta.url),'utf8');
+assert.match(html,/id="message"/);
+assert.match(html,/id="review"/);
+assert.match(html,/maxlength="4000"/);
+assert.match(js,/review.hidden/);
+assert.match(js,/Authorization:'Bearer '/);
+assert.doesNotMatch(js,/GREEN_API_TOKEN|waInstance/);
+assert.match(edge,/app_metadata\?\.web_kit_admin/);
+assert.match(edge,/GROUP_ID="120363431174972238@g.us"/);
+console.log('WhatsApp static checks passed');
