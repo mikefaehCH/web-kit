@@ -69,3 +69,24 @@ assert.equal(readmeOnly([{filename:'docs/README.md',status:'modified'}]),false);
 assert.equal(readmeOnly([{filename:'README.md',status:'renamed',previous_filename:'AGENTS.md'}]),false,'Umbenennung AGENTS.md -> README.md');
 assert.equal(readmeOnly([{filename:'README.md',status:'removed'}]),false,'Löschung');
 console.log('Runner filter fixtures passed');
+
+// Current Render, local SDK and PKCE assertions from main.
+// Isoliertes Admin-Hosting: Security-Header und PKCE muessen in PR-CI geprueft werden.
+const render=readFileSync(new URL('../render.yaml',import.meta.url),'utf8');
+const sdkPackage=JSON.parse(readFileSync(new URL('../admin/package.json',import.meta.url),'utf8'));
+const sdkLock=JSON.parse(readFileSync(new URL('../admin/package-lock.json',import.meta.url),'utf8'));
+assert.match(render,/name: Strict-Transport-Security/);
+assert.match(render,/max-age=31536000/);
+assert.match(render,/name: Content-Security-Policy/);
+assert.match(render,/frame-ancestors 'none'/);
+assert.match(render,/name: Cache-Control/);
+assert.match(render,/value: no-store/);
+assert.match(render,/script-src 'self';/);
+assert.doesNotMatch(render,/esm\.sh/);
+assert.match(auth,/from '\.\/vendor\/supabase\.js'/);
+assert.doesNotMatch(auth,/https:\/\/esm\.sh/);
+assert.equal(sdkPackage.dependencies['@supabase/supabase-js'],'2.118.0');
+assert.equal(sdkLock.packages['node_modules/@supabase/supabase-js'].version,'2.118.0');
+assert.match(render,/staticPublishPath: \.\/admin\/dist/);
+assert.match(auth,/flowType:'pkce'/);
+console.log('Render headers, local SDK and PKCE checks passed');
