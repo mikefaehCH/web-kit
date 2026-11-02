@@ -37,3 +37,14 @@ assert.doesNotMatch(hardening,/grant execute[^;]*to authenticated/);
 assert.doesNotMatch(hardening,/create policy/i);
 assert.doesNotMatch(js+auth+html,/service_role|sb_secret_|GREEN_API/);
 console.log('Security static checks passed');
+
+// Isoliertes Admin-Hosting: Security-Header und PKCE muessen in PR-CI geprueft werden.
+const render=readFileSync(new URL('../render.yaml',import.meta.url),'utf8');
+assert.match(render,/name: Strict-Transport-Security/);
+assert.match(render,/max-age=31536000/);
+assert.match(render,/name: Content-Security-Policy/);
+assert.match(render,/frame-ancestors 'none'/);
+assert.match(render,/name: Cache-Control/);
+assert.match(render,/value: no-store/);
+assert.match(auth,/flowType:'pkce'/);
+console.log('Render header and PKCE checks passed');
