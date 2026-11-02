@@ -6,6 +6,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 jobs:
   guarded-merge:
     if: ${{ github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success' }}
@@ -34,5 +35,9 @@ jobs:
             fi
             # README-only low-risk edits are covered by the scoped owner opt-in and CI.
             # All other paths are rejected above and require independent review.
-            gh api -X PUT "repos/$GH_REPO/pulls/$pr/merge" -f merge_method=squash -f sha="$RUN_SHA"
+            # GITHUB_TOKEN merges do not trigger push workflows; explicitly dispatch the post-merge check.
+            merged=$(gh api -X PUT "repos/$GH_REPO/pulls/$pr/merge" -f merge_method=squash -f sha="$RUN_SHA" --jq '.merged')
+            if [[ "$merged" == "true" ]]; then
+              gh workflow run "Web-kit quality" --ref main
+            fi
           done
