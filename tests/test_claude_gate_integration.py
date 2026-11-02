@@ -327,24 +327,27 @@ class CheckRunTests(unittest.TestCase):
             "app-token", "owner/repo", 73, "failure", "Unexpected GitHub App identity."
         )
 
-    def test_ledger_claim_must_be_in_progress_under_expected_app(self):
+    def test_ledger_claim_is_atomic_completed_neutral_under_expected_app(self):
         fingerprint = "f" * 64
         good = {
-            "id": 80, "app": {"id": 123}, "status": "in_progress", "head_sha": BASE,
-            "external_id": f"claude-review-ledger-{fingerprint}",
+            "id": 80, "app": {"id": 123}, "status": "completed", "conclusion": "neutral",
+            "head_sha": BASE, "external_id": f"claude-review-ledger-{fingerprint}",
+            "output": {"title": "Ledger record: OPEN"},
         }
 
         def fake_urlopen(request, timeout):
             payload = json.loads(request.data)
             self.assertEqual(payload["name"], "Claude review ledger")
             self.assertEqual(payload["head_sha"], BASE)
-            self.assertEqual(payload["status"], "in_progress")
+            self.assertEqual(payload["status"], "completed")
+            self.assertEqual(payload["conclusion"], "neutral")
             return FakeHTTPResponse(json.dumps(good).encode())
 
         with patch("scripts.run_claude_review.open_url", fake_urlopen):
             self.assertEqual(run_claude_review.claim_ledger("t", "owner/repo", BASE, fingerprint, 123), 80)
-        for field, value in (("app", {"id": 456}), ("status", "completed"),
-                             ("head_sha", "c" * 40), ("external_id", "other"), ("id", True)):
+        for field, value in (("app", {"id": 456}), ("status", "in_progress"),
+                             ("conclusion", "failure"), ("head_sha", "c" * 40),
+                             ("external_id", "other"), ("id", True)):
             bad = {**good, field: value}
             with self.subTest(field=field), patch(
                 "scripts.run_claude_review.open_url",
@@ -372,9 +375,14 @@ class CheckRunTests(unittest.TestCase):
             {"id": 5, "name": "Claude review ledger", "external_id": ext, "head_sha": "c" * 40,
              "status": "completed", "conclusion": "failure", "app": {"id": 123}},
         ]
-        with patch("scripts.run_claude_review.request_json", return_value={"check_runs": runs}) as request:
+        with patch("scripts.run_claude_review.request_json", return_value={"check_runs": runs}) as request, \
+             patch("scripts.run_claude_review.send_json", return_value={
+                 "id": 1, "status": "completed", "conclusion": "neutral",
+                 "output": {"title": "Ledger record: FAIL"},
+             }) as update:
             entries = run_claude_review.list_ledger_entries("t", "owner/repo", BASE, fingerprint, 123)
-        self.assertEqual([entry["id"] for entry in entries], [1])
+        self.assertEqual(entries, [{"id": 1, "state": "fail"}])
+        self.assertEqual(update.call_args.kwargs["payload"]["conclusion"], "neutral")
         self.assertIn("check_name=Claude%20review%20ledger", request.call_args.args[0])
         with patch("scripts.run_claude_review.request_json", return_value={"check_runs": "x"}):
             with self.assertRaises(run_claude_review.ReviewError):
@@ -632,3 +640,4 @@ class DiffFetchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
