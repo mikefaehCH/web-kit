@@ -24,7 +24,7 @@ confirm.addEventListener('click',async()=>{
   try{
     const token=await getToken();
     if(!token)throw new Error('Bitte zuerst als Administrator anmelden.');
-    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({message:message.value,requestKey})});
+    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,'apikey':'sb_publishable_Qeom38G18vSgrrE5MxoXEw_LhJM1f6S'},body:JSON.stringify({message:message.value,requestKey})});
     if(!response.ok)throw new Error('Versand fehlgeschlagen (HTTP '+response.status+').');
     status.textContent='Nachricht an Camino gesendet.';message.value='';count.textContent='0';review.hidden=true;
   }catch(error){status.textContent=error instanceof Error?error.message:'Versand fehlgeschlagen.';}
