@@ -46,7 +46,7 @@ Der vertrauenswürdige `pull_request_target`-Job läuft auf der Basis-Ref `main`
 5. `Protect main` erneut auslesen: alle vier CI-Checks plus App-gebundener `Claude review`, erwartete App-Quelle, aktuelle Basis, null Approval-Anforderung im Solo-Maintainer-Modell, keine Bypass-Akteure.
 6. Gate erst nach diesen Nachweisen als aktiv dokumentieren. Aktuell ist der Gate-Workflow noch nicht auf `main`; `Protect main` verlangt noch nicht den App-gebundenen Claude-Check und erzwingt keine aktuelle Basis. Der Gate-Status bleibt inaktiv.
 
-Ein LLM kann durch adversariale Inhalte beeinflusst werden; strukturierte Ausgabe und Prompt-Injection-Abwehr reduzieren das Risiko, beweisen aber keine Unfehlbarkeit. Für Änderungen am Gate, Validator, Ruleset oder an Berechtigungen sind separate Claude- und ChatGPT-Reviews am exakten HEAD und die ausdrückliche Merge-Entscheidung des alleinigen Maintainers erforderlich. Das sind technische Reviews, keine GitHub-Approvals.
+Ein LLM kann durch adversariale Inhalte beeinflusst werden; strukturierte Ausgabe und Prompt-Injection-Abwehr reduzieren das Risiko, beweisen aber keine Unfehlbarkeit. Gegenprüfungen erfolgen nach Urheberschaft am selben exakten HEAD: Claude prüft Änderungen von ChatGPT/Codex; ChatGPT/Codex prüft Änderungen von Claude. Bei gemischter Autorenschaft prüft jeder Agent die Teile des anderen. Mike prüft den Gesamtstand und entscheidet ausdrücklich über den Merge. Ein zusätzlicher externer Reviewer ist nicht erforderlich. Das sind technische Reviews, keine GitHub-Approvals.
 
 Referenzen:
 - https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions
