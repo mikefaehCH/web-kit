@@ -3,7 +3,7 @@ name: Claude review
 on:
   pull_request_target:
     branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review, edited]
 
 # This workflow is loaded from the trusted base branch. It never checks out or
 # executes pull-request code; the diff is fetched as untrusted text by the runner.
@@ -14,15 +14,15 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: claude-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: claude-review-${{ github.event.pull_request.head.sha }}-${{ github.event.pull_request.base.sha }}
+  cancel-in-progress: false
 
 jobs:
   review:
     name: Review (trusted runner)
     runs-on: ubuntu-latest
     timeout-minutes: 8
-    if: ${{ github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.draft == false && (github.event.action != 'edited' || github.event.changes.base != null) }}
     environment: claude-review
     steps:
       - name: Check out trusted base revision
