@@ -20,7 +20,7 @@ concurrency:
 jobs:
   review:
     # Disabled until the owner confirms an enforced provider-side spend cap.
-    if: ${{ vars.CLAUDE_REVIEW_ENABLED == 'true' }}
+    if: ${{ vars.CLAUDE_REVIEW_ENABLED == 'true' && false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
