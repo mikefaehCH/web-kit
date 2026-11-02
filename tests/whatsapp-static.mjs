@@ -6,7 +6,7 @@ const auth=readFileSync(new URL('../admin/auth.js',import.meta.url),'utf8');
 const css=readFileSync(new URL('../admin/whatsapp.css',import.meta.url),'utf8');
 const edgeIndex=readFileSync(new URL('../supabase/functions/web-kit-whatsapp-send/index.ts',import.meta.url),'utf8');
 const edge=readFileSync(new URL('../supabase/functions/web-kit-whatsapp-send/handler.ts',import.meta.url),'utf8');
-const hardening=readFileSync(new URL('../supabase/migrations/20261102090000_web_kit_whatsapp_service_role_only.sql',import.meta.url),'utf8');
+const hardening=readFileSync(new URL('../supabase/migrations/20261102061405_web_kit_whatsapp_service_role_only.sql',import.meta.url),'utf8');
 assert.match(html,/id="message"/);
 assert.match(html,/id="review"/);
 assert.match(html,/maxlength="4000"/);
@@ -37,3 +37,17 @@ assert.doesNotMatch(hardening,/grant execute[^;]*to authenticated/);
 assert.doesNotMatch(hardening,/create policy/i);
 assert.doesNotMatch(js+auth+html,/service_role|sb_secret_|GREEN_API/);
 console.log('Security static checks passed');
+
+// Migrationsdateien müssen den in Supabase angewendeten Versionen entsprechen (sonst würde `supabase db push` sie erneut ausführen).
+import { readdirSync } from 'node:fs';
+const migrations=readdirSync(new URL('../supabase/migrations/',import.meta.url)).filter(f=>f.endsWith('.sql')).sort();
+assert.deepEqual(migrations,[
+  '20261102053907_web_kit_whatsapp_dispatch_control.sql',
+  '20261102053911_web_kit_whatsapp_dispatch_finish.sql',
+  '20261102061405_web_kit_whatsapp_service_role_only.sql',
+]);
+// Autonomer Runner: ausschliesslich README.md (AGENTS.md, RELEASE_POLICY.md §7).
+const runner=readFileSync(new URL('../.github/workflows/autonomous-merge.yml',import.meta.url),'utf8');
+assert.match(runner,/grep -Ev '\^README\\\.md\$'/);
+assert.doesNotMatch(runner,/AGENTS\|RELEASE_POLICY/);
+console.log('Release and migration checks passed');

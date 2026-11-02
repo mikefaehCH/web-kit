@@ -26,10 +26,11 @@ jobs:
               .head.sha==$sha and .head.repo.full_name==.base.repo.full_name and
               (.body // "" | test("(?m)^Autonomy-Release: true$"))
             ' pr.json >/dev/null || continue
-            # Only simple README edits may merge with scaffold-only checks.
+            # Only README.md edits may merge with scaffold-only checks (AGENTS.md, RELEASE_POLICY.md §7).
+            # Rule files (AGENTS.md, RELEASE_POLICY.md) and everything else need independent review.
             changed=$(gh api --paginate "repos/$GH_REPO/pulls/$pr/files?per_page=100" --jq '.[].filename')
-            if echo "$changed" | grep -Ev '^(README|AGENTS|RELEASE_POLICY)\.md$' >/dev/null; then
-              echo "Not docs-only; no generator quality gate yet."
+            if [ -z "$changed" ] || echo "$changed" | grep -Ev '^README\.md$' >/dev/null; then
+              echo "Not README-only; independent review required."
               continue
             fi
             # README-only low-risk edits are covered by the scoped owner opt-in and CI.

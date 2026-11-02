@@ -19,7 +19,9 @@ Pro Admin und Stunde höchstens zehn Versandversuche. Jeder Request erhält eine
 
 ## Ausrollen der Härtung (Befund A) – Reihenfolge verbindlich
 
-1. Migration `20261102090000_web_kit_whatsapp_service_role_only` auf `qoensghjemruqafrbmjd` anwenden.
+Stand 2.11.2026, 07:15: Schritte 1–3 erledigt (Migration als Version `20261102061405` angewendet, Edge Function v3 aktiv, Advisor ohne `0029`). Offen: Schritte 4–5.
+
+1. Migration `20261102061405_web_kit_whatsapp_service_role_only` auf `qoensghjemruqafrbmjd` anwenden.
    Ab jetzt antwortet die alte Funktion v2 mit 503 (fail-closed), es wird nichts versendet.
 2. Edge Function aus `supabase/functions/web-kit-whatsapp-send/` (index.ts **und** handler.ts) deployen, `verify_jwt` = true.
 3. `get_advisors(security)`: Die beiden Warnungen `0029` müssen verschwunden sein; `0008` (RLS ohne Policies) bleibt bewusst.

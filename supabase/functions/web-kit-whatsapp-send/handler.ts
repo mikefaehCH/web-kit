@@ -159,7 +159,8 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   const recorded = await finish("accepted", providerId);
   if (!recorded) {
     // Provider accepted the message, but audit confirmation failed: never claim a fully successful dispatch.
-    deps.log("dispatch_audit_unconfirmed", { ref });
+    // Provider-ID loggen (kein Personenbezug), damit der Versand nachträglich abgeglichen werden kann.
+    deps.log("dispatch_audit_unconfirmed", { ref, providerId });
     return json({ error: "Message accepted by provider but audit status unconfirmed; check the group and contact administrator before retrying", status: "unknown" }, 504);
   }
   deps.log("dispatch_accepted", { ref });

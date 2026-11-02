@@ -1,6 +1,6 @@
 -- Bereits produktiv angewendet (Projekt qoensghjemruqafrbmjd, Version 20261102053907).
 -- Hier unverändert versioniert, damit Repository und Datenbank übereinstimmen.
--- Die Berechtigungen werden durch 20261102090000_web_kit_whatsapp_service_role_only.sql gehärtet.
+-- Die Berechtigungen werden durch 20261102061405_web_kit_whatsapp_service_role_only.sql gehärtet.
 create table if not exists public.web_kit_whatsapp_dispatches (
  id uuid primary key default gen_random_uuid(),
  actor_id uuid not null,

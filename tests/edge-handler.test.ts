@@ -171,7 +171,7 @@ test("finish nicht protokolliert: trotz Provider-Annahme kein Erfolg und kein au
   assert.equal(body.status, "unknown");
   assert.equal(t.fetches.length, 1);
   assert.ok(t.logs.some((l) => l.includes("dispatch_finish_not_recorded")));
-  assert.ok(t.logs.some((l) => l.includes("dispatch_audit_unconfirmed")));
+  assert.ok(t.logs.some((l) => l.includes("dispatch_audit_unconfirmed") && l.includes("BAE5F4886AD4B04E")), "Provider-ID für Abgleich geloggt");
 });
 
 test("keine Secrets oder Nachrichtentexte in Antworten und Logs", async () => {
