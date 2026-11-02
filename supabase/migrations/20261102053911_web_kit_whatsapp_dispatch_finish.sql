@@ -1,6 +1,6 @@
 -- Bereits produktiv angewendet (Projekt qoensghjemruqafrbmjd, Version 20261102053911).
 -- Hier unverändert versioniert. Befund A (Supabase-Linter 0029): durch authenticated aufrufbar.
--- Gehärtet durch 20261102090000_web_kit_whatsapp_service_role_only.sql.
+-- Gehärtet durch 20261102061405_web_kit_whatsapp_service_role_only.sql.
 create or replace function public.web_kit_whatsapp_finish(p_actor uuid,p_key uuid,p_status text,p_provider_id text default null)
 returns boolean language plpgsql security definer set search_path = '' as $$
 begin

@@ -21,12 +21,14 @@ Pro Admin und Stunde höchstens zehn Versandversuche. Jeder Request erhält eine
 
 ## Ausrollen der Härtung (Befund A) – Reihenfolge verbindlich
 
-1. Migration `20261102061405_web_kit_whatsapp_service_role_only` ist laut produktiver Migrationsliste bereits angewendet; vor Änderungen die Liste erneut prüfen. Migrationen nicht erneut ausführen.
-   Ab jetzt antwortet die alte Funktion v2 mit 503 (fail-closed), es wird nichts versendet.
-2. Edge Function aus `supabase/functions/web-kit-whatsapp-send/` (index.ts **und** handler.ts) deployen, `verify_jwt` = true.
+**Historischer Betreiberbericht vom 02.11.2026, 07:15 (nicht unabhängig verifiziert):** Schritte 1–3 seien damals erledigt gewesen. Vor weiteren Änderungen den tatsächlichen Plattformstatus erneut prüfen.
+
+1. Die Migration `20261102061405_web_kit_whatsapp_service_role_only` ist laut produktiver Migrationsliste bereits angewendet. Vor Änderungen die Liste erneut prüfen; diese Migration nicht erneut ausführen.
+   Solange die gehärtete Funktion v3 nicht bestätigt aktiv ist, antwortet die alte Funktion v2 fail-closed mit 503 und versendet nichts.
+2. Edge Function aus `supabase/functions/web-kit-whatsapp-send/` (`index.ts` **und** `handler.ts`) deployen, `verify_jwt = true`.
 3. `get_advisors(security)`: Die beiden Warnungen `0029` müssen verschwunden sein; `0008` (RLS ohne Policies) bleibt bewusst.
 4. Smoke-Tests ohne echten Versand: ohne JWT → 401, Nicht-Admin → 403, ungültiger Body → 400.
-5. Ein Admin-Konto mit `raw_app_meta_data.web_kit_admin = true` einrichten (Stand 2.11.2026: **kein** Konto hat dieses Flag) und einen freigegebenen Testversand durchführen.
+5. Ein Admin-Konto mit `raw_app_meta_data.web_kit_admin = true` einrichten (Stand 02.11.2026: **kein** Konto hat dieses Flag) und nur nach separater Freigabe einen Testversand durchführen.
 
 Rollback: Edge Function v2 erneut deployen **und** alte Grants wiederherstellen ist bewusst nicht vorgesehen (würde Befund A wieder öffnen). Bei Problemen bleibt der Versand fail-closed, bis v3 läuft.
 
