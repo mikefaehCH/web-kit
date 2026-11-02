@@ -9,13 +9,16 @@ First-verdict ledger
 --------------------
 Every model evaluation is keyed by a SHA-256 fingerprint of the complete review
 context (patches plus full file contents) and recorded as an App-owned check run
-on the immutable base commit. Before a paid model call the runner claims the
-fingerprint with an ``in_progress`` ledger entry. The first final verdict for a
-fingerprint on a base wins: a recorded PASS may be reused, a recorded non-pass
-or any unresolved entry blocks further evaluations of the same fingerprint.
-Only transport failures without a provider response are released as retryable
-(``neutral``). A failed ledger update leaves the claim ``in_progress`` and
-therefore blocks (fail-closed).
+on the immutable base commit. Ledger runs are always completed with a neutral
+conclusion so they cannot block CI or Render deployments on ``main``. Their
+state (open, PASS, non-pass, released) is stored in the App-owned check output.
+Before a paid model call the runner atomically creates an open ledger record.
+The first final verdict for a fingerprint on a base wins: a recorded PASS may
+be reused, a recorded non-pass or any unresolved entry blocks further
+evaluations of the same fingerprint. Only transport failures without a provider
+response are released as retryable. Failed updates leave the open record in
+place and therefore block (fail-closed). Legacy ledger runs are normalized to
+neutral GitHub conclusions while preserving their state.
 """
 
 from __future__ import annotations
@@ -53,6 +56,7 @@ MAX_LINE_NUMBER = 10_000_000
 PR_CHECK_NAME = "Claude review"
 LEDGER_CHECK_NAME = "Claude review ledger"
 LEDGER_PREFIX = "claude-review-ledger-"
+LEDGER_STATE_PREFIX = "Ledger record: "
 MODEL = "claude-sonnet-5"
 
 # Ledger decisions, ordered from most to least restrictive.
@@ -218,9 +222,59 @@ def complete_check_run(token: str, repo: str, check_id: int, conclusion: str,
 
 # --------------------------------------------------------------------------- ledger
 
+def _legacy_ledger_state(run: dict[str, Any]) -> str:
+    """Map a pre-neutral ledger run to its sticky logical state."""
+    output = run.get("output") if isinstance(run.get("output"), dict) else {}
+    title = output.get("title")
+    if isinstance(title, str) and title.startswith(LEDGER_STATE_PREFIX):
+        state = title[len(LEDGER_STATE_PREFIX):].lower()
+        return state if state in {"open", "pass", "fail", "released"} else "fail"
+    status = run.get("status")
+    conclusion = run.get("conclusion")
+    if status != "completed":
+        return "open"
+    if conclusion == "success":
+        return "pass"
+    if conclusion == "neutral":
+        return "released"
+    return "fail"
+
+
+def write_ledger_record(token: str, repo: str, run_id: int, state: str) -> None:
+    """Persist logical state while keeping the GitHub check completed/neutral."""
+    if state not in {"open", "pass", "fail", "released"}:
+        raise ValueError("invalid ledger state")
+    summaries = {
+        "open": "A review claim exists. It blocks reevaluation until resolved.",
+        "pass": "The first verdict for this review fingerprint was PASS.",
+        "fail": "The first verdict was non-passing; reevaluation is blocked.",
+        "released": "No provider response was received or this claim was superseded.",
+    }
+    result = send_json(
+        f"{API_ROOT}/repos/{repo}/check-runs/{run_id}", token=token,
+        method="PATCH", payload={
+            "status": "completed", "conclusion": "neutral",
+            "output": {"title": f"{LEDGER_STATE_PREFIX}{state.upper()}",
+                       "summary": summaries[state]},
+        },
+    )
+    output = result.get("output") if isinstance(result, dict) else None
+    if (not isinstance(result, dict) or result.get("id") != run_id
+            or result.get("status") != "completed"
+            or result.get("conclusion") != "neutral"
+            or not isinstance(output, dict)
+            or output.get("title") != f"{LEDGER_STATE_PREFIX}{state.upper()}"):
+        raise ReviewError("Ledger normalization or update was not confirmed")
+
+
 def list_ledger_entries(token: str, repo: str, base_sha: str, fingerprint: str,
                         expected_app_id: int) -> list[dict[str, Any]]:
-    """Return App-owned ledger entries for one fingerprint on one base commit."""
+    """Return entries for a fingerprint and neutralize legacy checks on the base.
+
+    Every App-owned ledger run for this base is normalized, not only the current
+    fingerprint, so old failure/in_progress conclusions cannot block CI or a
+    Render deployment. The logical state remains sticky in the check output.
+    """
     external_id = ledger_external_id(fingerprint)
     check_name = urllib.parse.quote(LEDGER_CHECK_NAME, safe="")
     entries: list[dict[str, Any]] = []
@@ -234,20 +288,23 @@ def list_ledger_entries(token: str, repo: str, base_sha: str, fingerprint: str,
         if not isinstance(runs, list):
             raise ReviewError("GitHub returned an invalid ledger list")
         for run in runs:
-            if (
-                isinstance(run, dict)
-                and run.get("name") == LEDGER_CHECK_NAME
-                and run.get("external_id") == external_id
-                and run.get("head_sha") == base_sha
-                and isinstance(run.get("app"), dict)
-                and run["app"].get("id") == expected_app_id
-                and type(run.get("id")) is int
-            ):
-                entries.append({
-                    "id": run["id"],
-                    "status": run.get("status"),
-                    "conclusion": run.get("conclusion"),
-                })
+            if not (isinstance(run, dict)
+                    and run.get("name") == LEDGER_CHECK_NAME
+                    and run.get("head_sha") == base_sha
+                    and isinstance(run.get("external_id"), str)
+                    and re.fullmatch(LEDGER_PREFIX + r"[0-9a-f]{64}", run["external_id"])
+                    and isinstance(run.get("app"), dict)
+                    and run["app"].get("id") == expected_app_id
+                    and type(run.get("id")) is int):
+                continue
+            state = _legacy_ledger_state(run)
+            output = run.get("output") if isinstance(run.get("output"), dict) else {}
+            expected_title = f"{LEDGER_STATE_PREFIX}{state.upper()}"
+            if (run.get("status") != "completed" or run.get("conclusion") != "neutral"
+                    or output.get("title") != expected_title):
+                write_ledger_record(token, repo, run["id"], state)
+            if run.get("external_id") == external_id:
+                entries.append({"id": run["id"], "state": state})
         if len(runs) < 100:
             return entries
     raise ReviewError("Ledger history exceeded its safe scan limit")
@@ -255,28 +312,26 @@ def list_ledger_entries(token: str, repo: str, base_sha: str, fingerprint: str,
 
 def ledger_decision(entries: list[dict[str, Any]], *, exclude_id: int | None = None,
                     before_id: int | None = None) -> str:
-    """Reduce ledger entries to one decision; the most restrictive state wins.
-
-    - completed/failure, or any unknown completed conclusion -> fail (sticky)
-    - not completed (queued/in_progress) -> blocked (unresolved evaluation);
-      with ``before_id`` only entries created before that claim block
-    - completed/success -> pass (reusable first verdict)
-    - completed/neutral -> released transport failure or superseded claim
-    """
+    """Reduce logical ledger states; the most restrictive state wins."""
     decision = LEDGER_OPEN
     for entry in entries:
         entry_id = entry.get("id")
         if exclude_id is not None and entry_id == exclude_id:
             continue
-        status = entry.get("status")
-        conclusion = entry.get("conclusion")
-        if status == "completed":
-            if conclusion == "neutral":
-                continue
-            if conclusion == "success":
-                if decision == LEDGER_OPEN:
-                    decision = LEDGER_PASS
-                continue
+        state = entry.get("state")
+        if state is None:  # Legacy/injected records in tests and migration.
+            state = _legacy_ledger_state({
+                "status": entry.get("status"),
+                "conclusion": entry.get("conclusion"),
+                "output": entry.get("output"),
+            })
+        if state == "released":
+            continue
+        if state == "pass":
+            if decision == LEDGER_OPEN:
+                decision = LEDGER_PASS
+            continue
+        if state == "fail" or state not in {"open", "pass", "released"}:
             return LEDGER_FAIL
         if before_id is not None and type(entry_id) is int and entry_id > before_id:
             # A later concurrent claim loses arbitration against this one.
@@ -287,67 +342,39 @@ def ledger_decision(entries: list[dict[str, Any]], *, exclude_id: int | None = N
 
 def claim_ledger(token: str, repo: str, base_sha: str, fingerprint: str,
                  expected_app_id: int) -> int:
-    """Create a provable App-owned in_progress claim before any paid model call."""
+    """Atomically create a completed/neutral claim before any paid model call."""
     external_id = ledger_external_id(fingerprint)
     result = send_json(
-        f"{API_ROOT}/repos/{repo}/check-runs",
-        token=token,
-        method="POST",
+        f"{API_ROOT}/repos/{repo}/check-runs", token=token, method="POST",
         payload={
-            "name": LEDGER_CHECK_NAME,
-            "head_sha": base_sha,
-            "external_id": external_id,
-            "status": "in_progress",
-            "output": {
-                "title": "Claude evaluation claimed",
-                "summary": "An evaluation of this review fingerprint is in progress.",
-            },
+            "name": LEDGER_CHECK_NAME, "head_sha": base_sha,
+            "external_id": external_id, "status": "completed", "conclusion": "neutral",
+            "output": {"title": f"{LEDGER_STATE_PREFIX}OPEN",
+                       "summary": "A review claim exists. It blocks reevaluation until resolved."},
         },
     )
     claim_id = result.get("id") if isinstance(result, dict) else None
-    if (
-        type(claim_id) is not int
-        or claim_id <= 0
-        or not isinstance(result.get("app"), dict)
-        or result["app"].get("id") != expected_app_id
-        or result.get("external_id") != external_id
-        or result.get("head_sha") != base_sha
-        or result.get("status") != "in_progress"
-    ):
-        raise ReviewError("Ledger claim was not persisted under the expected App")
+    output = result.get("output") if isinstance(result, dict) else None
+    if (type(claim_id) is not int or claim_id <= 0
+            or not isinstance(result.get("app"), dict)
+            or result["app"].get("id") != expected_app_id
+            or result.get("external_id") != external_id
+            or result.get("head_sha") != base_sha
+            or result.get("status") != "completed"
+            or result.get("conclusion") != "neutral"
+            or not isinstance(output, dict)
+            or output.get("title") != f"{LEDGER_STATE_PREFIX}OPEN"):
+        raise ReviewError("Neutral ledger claim was not persisted under the expected App")
     return claim_id
 
 
-LEDGER_SUMMARIES = {
-    "success": ("PASS recorded", "First verdict for this review fingerprint: PASS."),
-    "failure": ("Non-passing verdict recorded",
-                "First verdict for this review fingerprint is non-passing; re-evaluation is blocked."),
-    "neutral": ("Claim released",
-                "No verdict was produced (transport failure or superseded claim); retry is allowed."),
-}
+LEDGER_CONCLUSION_STATE = {"success": "pass", "failure": "fail", "neutral": "released"}
 
 
 def finalize_ledger(token: str, repo: str, claim_id: int, conclusion: str) -> None:
-    if conclusion not in LEDGER_SUMMARIES:
+    if conclusion not in LEDGER_CONCLUSION_STATE:
         raise ValueError("invalid ledger conclusion")
-    title, summary = LEDGER_SUMMARIES[conclusion]
-    result = send_json(
-        f"{API_ROOT}/repos/{repo}/check-runs/{claim_id}",
-        token=token,
-        method="PATCH",
-        payload={
-            "status": "completed",
-            "conclusion": conclusion,
-            "output": {"title": title, "summary": summary},
-        },
-    )
-    if (
-        not isinstance(result, dict)
-        or result.get("id") != claim_id
-        or result.get("status") != "completed"
-        or result.get("conclusion") != conclusion
-    ):
-        raise ReviewError("Ledger finalization was not confirmed")
+    write_ledger_record(token, repo, claim_id, LEDGER_CONCLUSION_STATE[conclusion])
 
 
 # --------------------------------------------------------------------------- PR data
@@ -691,12 +718,12 @@ def confirm_single_pass(token: str, repo: str, base_sha: str, fingerprint: str,
     entries = list_ledger_entries(token, repo, base_sha, fingerprint, expected_app_id)
     pass_ids: list[int] = []
     for entry in entries:
-        if entry.get("status") != "completed":
+        state = entry.get("state")
+        if state == "open":
             raise ReviewError("An unresolved ledger claim exists for this fingerprint")
-        conclusion = entry.get("conclusion")
-        if conclusion == "success":
+        if state == "pass":
             pass_ids.append(entry["id"])
-        elif conclusion != "neutral":
+        elif state != "released":
             raise ReviewError("A non-passing or unknown ledger entry exists for this fingerprint")
     if len(pass_ids) != 1:
         raise ReviewError("Ledger does not hold exactly one valid PASS")
@@ -890,3 +917,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

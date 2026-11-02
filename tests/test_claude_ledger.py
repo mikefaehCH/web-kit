@@ -125,6 +125,7 @@ class FakeGitHub:
                 payload["status"], payload.get("conclusion"),
                 app_id=self.ledger_app_override if (is_ledger and self.ledger_app_override) else APP_ID,
             )
+            self.runs[run_id]["output"] = payload.get("output", {})
             if is_ledger and self.after_ledger_post:
                 self.after_ledger_post(payload)
             return dict(self.runs[run_id])
@@ -193,7 +194,9 @@ class LedgerGateTests(unittest.TestCase):
         return rcr.review_fingerprint(context)
 
     def ledger_states(self):
-        return [(run["status"], run["conclusion"]) for run in self.gh.ledger()]
+        logical = {"PASS": "success", "FAIL": "failure", "RELEASED": "neutral", "OPEN": None}
+        return [(run["status"], logical.get(run.get("output", {}).get("title", "").removeprefix(
+            rcr.LEDGER_STATE_PREFIX))) for run in self.gh.ledger()]
 
     # --- first verdict wins ----------------------------------------------
     def test_pass_is_recorded_and_reused_by_another_pr_with_identical_fingerprint(self):
@@ -245,6 +248,25 @@ class LedgerGateTests(unittest.TestCase):
         self.gh.insert_run(rcr.LEDGER_CHECK_NAME, BASE, external_id, "completed", "failure", app_id=999)
         provider = Provider(verdict_for(HEAD_A))
         self.assertEqual(self.run_gate(4, provider), 0)
+        self.assertEqual(provider.calls, 1)
+
+    def test_all_ledger_checks_on_main_are_neutral_and_legacy_failures_are_preserved(self):
+        external_id = rcr.ledger_external_id(self.fingerprint(4))
+        legacy_id = self.gh.insert_run(rcr.LEDGER_CHECK_NAME, BASE, external_id,
+                                       "completed", "failure")
+        other_id = self.gh.insert_run(rcr.LEDGER_CHECK_NAME, BASE,
+                                      rcr.ledger_external_id("e" * 64), "in_progress")
+        self.gh.add_pr(5, HEAD_B)
+        self.gh.prs[5]["content"] = {"src/app.py": "different content"}
+        provider = Provider(verdict_for(HEAD_B))
+        self.assertEqual(self.run_gate(5, provider), 0)
+        self.assertEqual(self.gh.runs[legacy_id]["conclusion"], "neutral")
+        self.assertEqual(self.gh.runs[legacy_id]["output"]["title"], "Ledger record: FAIL")
+        self.assertEqual(self.gh.runs[other_id]["conclusion"], "neutral")
+        self.assertEqual(self.gh.runs[other_id]["output"]["title"], "Ledger record: OPEN")
+        self.assertTrue(all(run["conclusion"] == "neutral" for run in self.gh.ledger()))
+        # The legacy non-pass remains sticky despite its neutral GitHub conclusion.
+        self.assertEqual(self.run_gate(4, provider), 1)
         self.assertEqual(provider.calls, 1)
 
     # --- parallel and concurrent evaluations --------------------------------
@@ -301,12 +323,16 @@ class LedgerGateTests(unittest.TestCase):
         self.assertEqual(self.run_gate(4, provider), 1)
         self.assertEqual(provider.calls, 1)
         own = min(self.gh.ledger(), key=lambda run: run["id"])
-        self.assertEqual((own["status"], own["conclusion"]), ("completed", "success"))
+        self.assertEqual((own["status"], own["conclusion"], own["output"]["title"]),
+                         ("completed", "neutral", "Ledger record: PASS"))
         # ... but the unresolved later claim keeps the PR check fail-closed.
         self.assertEqual(self.gh.pr_check(4)["conclusion"], "failure")
         self.gh.after_ledger_post = None
-        self.gh.runs[later["id"]].update(status="completed", conclusion="neutral")
-        self.assertEqual(self.run_gate(4, provider), 0)
+        self.gh.runs[later["id"]].update(
+            status="completed", conclusion="neutral",
+            output={"title": "Ledger record: RELEASED", "summary": "released"},
+        )
+        self.assertEqual(self.run_gate(4, provider), 0, self.gh.pr_check(4))
         self.assertEqual(provider.calls, 1)
 
     # --- final recheck immediately before a PR PASS ---------------------------
@@ -318,7 +344,7 @@ class LedgerGateTests(unittest.TestCase):
                 self.setUp()
 
                 def inject(run, status=status, conclusion=conclusion):
-                    if run["conclusion"] == "success":
+                    if run.get("output", {}).get("title") == "Ledger record: PASS":
                         self.gh.after_ledger_patch = None
                         self.gh.insert_run(rcr.LEDGER_CHECK_NAME, BASE, run["external_id"], status, conclusion)
 
@@ -330,7 +356,7 @@ class LedgerGateTests(unittest.TestCase):
 
     def test_unavailable_ledger_recheck_never_produces_pr_pass(self):
         def break_listing(run):
-            if run["conclusion"] == "success":
+            if run.get("output", {}).get("title") == "Ledger record: PASS":
                 self.gh.fail_ledger_list = True
 
         self.gh.after_ledger_patch = break_listing
@@ -343,7 +369,7 @@ class LedgerGateTests(unittest.TestCase):
                 self.setUp()
 
                 def move(run, moved=moved):
-                    if run["conclusion"] != "success":
+                    if run.get("output", {}).get("title") != "Ledger record: PASS":
                         return
                     if moved == "main":
                         self.gh.main = HEAD_C
@@ -610,7 +636,8 @@ class LedgerGateTests(unittest.TestCase):
                 self.gh.fail_ledger_patch = True
                 self.assertEqual(self.run_gate(4, provider), 1)
                 self.assertEqual(self.gh.pr_check(4)["conclusion"], "failure")
-                self.assertEqual(self.ledger_states(), [("in_progress", None)])
+                self.assertEqual(self.ledger_states(), [("completed", None)])
+                self.assertTrue(all(run["conclusion"] == "neutral" for run in self.gh.ledger()))
                 self.gh.fail_ledger_patch = False
                 self.assertEqual(self.run_gate(4, provider), 1)
                 self.assertEqual(provider.calls, 1)
@@ -686,3 +713,4 @@ class LedgerGateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
