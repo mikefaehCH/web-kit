@@ -26,6 +26,15 @@ Deno.serve(async(req)=>{
   try{body=await req.json();}catch{return json({error:"Invalid JSON"},400);}
   const message=(body&&typeof body==="object"&&"message" in body)?(body as {message:unknown}).message:null;
   if(typeof message!=="string"||!message.trim()||message.length>MAX)return json({error:"Message must be 1–4000 characters"},400);
+  const keyValue=(body&&typeof body==="object"&&"requestKey" in body)?(body as {requestKey:unknown}).requestKey:null;
+  if(typeof keyValue!=="string"||!^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(keyValue))return json({error:"Invalid request key"},400);
+  const bytes=new TextEncoder().encode(message.trim());
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes))).map(x=>x.toString(16).padStart(2,"0")).join("");
+  const authClient=createClient(url,anon,{global:{headers:{Authorization:auth}},auth:{persistSession:false}});
+  const claim=await authClient.rpc("web_kit_whatsapp_claim",{p_actor:user.id,p_key:keyValue,p_hash:digest});
+  if(claim.error)return json({error:"Dispatch control unavailable"},503);
+  if(claim.data!==true)return json({error:"Duplicate request or rate limit exceeded"},429);
+  const finish=async(status:string,providerId:string|null=null)=>{await authClient.rpc("web_kit_whatsapp_finish",{p_actor:user.id,p_key:keyValue,p_status:status,p_provider_id:providerId});};
   // Restrict to one fixed group. The client cannot select recipients.
   try{
     const upstream=await fetch(host+"/waInstance"+encodeURIComponent(instance)+"/sendMessage/"+encodeURIComponent(apiToken),{
@@ -33,9 +42,10 @@ Deno.serve(async(req)=>{
       body:JSON.stringify({chatId:GROUP_ID,message:message.trim()}),
       signal:AbortSignal.timeout(12000)
     });
-    if(!upstream.ok)return json({error:"Messaging provider rejected request"},502);
+    if(!upstream.ok){await finish("failed");return json({error:"Messaging provider rejected request"},502);}
     const result=await upstream.json().catch(()=>null);
-    if(!result||!result.idMessage)return json({error:"Provider did not confirm message"},502);
+    if(!result||!result.idMessage){await finish("failed");return json({error:"Provider did not confirm message"},502);}
+    await finish("accepted",result.idMessage);
     return json({ok:true,idMessage:result.idMessage});
-  }catch{return json({error:"Messaging provider unavailable"},502);}
+  }catch{return json({error:"Messaging provider unavailable; check dispatch audit before retrying"},502);}
 });
