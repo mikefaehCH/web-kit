@@ -13,16 +13,21 @@ permissions:
   contents: read
   pull-requests: read
 
-concurrency:
-  group: claude-review-${{ github.event.pull_request.head.sha }}-${{ github.event.pull_request.base.sha }}
-  cancel-in-progress: false
-
 jobs:
   review:
     name: Review (trusted runner)
     runs-on: ubuntu-latest
     timeout-minutes: 8
     if: ${{ github.event.pull_request.draft == false && (github.event.action != 'edited' || github.event.changes.base != null) }}
+    # Serialize all reviews against the same base commit so identical review
+    # fingerprints cannot be evaluated in parallel. Job-level (not workflow-level)
+    # so skipped runs (drafts, title edits) never occupy or replace a queue slot.
+    # Liveness limit: GitHub keeps at most one pending job per group; a newer
+    # pending job replaces an older pending one, which then creates no check.
+    # The PR stays blocked (missing required check) until it is re-triggered.
+    concurrency:
+      group: claude-review-${{ github.repository }}-${{ github.event.pull_request.base.sha }}
+      cancel-in-progress: false
     environment: claude-review
     steps:
       - name: Check out trusted base revision
