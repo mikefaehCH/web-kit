@@ -162,12 +162,16 @@ test("Provider 4xx failed, 5xx unknown, 2xx ohne gültige ID unknown", async () 
   }
 });
 
-test("finish nicht protokolliert: Versand ok, aber auditRecorded=false und Log", async () => {
+test("finish nicht protokolliert: trotz Provider-Annahme kein Erfolg und kein automatischer Neuversand", async () => {
   const t = setup({ finishResult: { data: false, error: null } });
   const res = await handle(req(ok), t.deps);
-  assert.equal(res.status, 200);
-  assert.equal((await res.json()).auditRecorded, false);
+  assert.equal(res.status, 504);
+  const body = await res.json();
+  assert.equal(body.ok, undefined);
+  assert.equal(body.status, "unknown");
+  assert.equal(t.fetches.length, 1);
   assert.ok(t.logs.some((l) => l.includes("dispatch_finish_not_recorded")));
+  assert.ok(t.logs.some((l) => l.includes("dispatch_audit_unconfirmed")));
 });
 
 test("keine Secrets oder Nachrichtentexte in Antworten und Logs", async () => {
