@@ -55,5 +55,19 @@ class GateCliIntegrationTests(unittest.TestCase):
                 self.assertEqual(result.stdout.strip(), "FAIL")
 
 
+class WorkflowSafetyTests(unittest.TestCase):
+    def test_review_uses_exact_sha_and_has_no_dispatch_secret_path(self):
+        workflow = Path(".github/workflows/claude-review.yml").read_text(encoding="utf-8")
+        self.assertNotIn("workflow_dispatch", workflow)
+        self.assertIn(
+            "git diff ${{ steps.scope.outputs.base_sha }}...${{ steps.scope.outputs.head_sha }}",
+            workflow,
+        )
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn(
+            '--allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git show:*),Bash(git log:*)"',
+            workflow,
+        )
+
 if __name__ == "__main__":
     unittest.main()
