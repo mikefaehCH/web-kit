@@ -24,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Test strict verdict validator
+        run: python3 -m unittest discover -s tests -p 'test_claude_verdict.py'
       - name: Validate PR scope and record exact SHA
         id: scope
         env:
