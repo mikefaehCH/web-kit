@@ -15,7 +15,7 @@ Versandkette: **Browser → Supabase Auth → Edge Function `web-kit-whatsapp-se
 | Audit | Append-only: Tabellenrechte nur `SELECT` für service_role, Schreiben ausschliesslich über die Funktionen; Trigger verhindert Ändern von Endstatus/Kernfeldern und Löschen. Kein Nachrichtentext, nur SHA-256-Hash. |
 | RLS ohne Policies (Befund B) | **Bewusst.** RLS ist aktiv, es gibt keine Policies und keine Tabellenrechte für `anon`/`authenticated` → kein direkter Client-Zugriff. Der Linter-Hinweis `0008 rls_enabled_no_policy` (INFO) ist erwartet; eine Policy würde nur Zugriff öffnen. |
 | Leaked Password Protection (Befund C) | Für Web-Kit nicht relevant: Login ist passwortlos (E-Mail-Code/Magic Link, `shouldCreateUser:false`). Die Einstellung ist projektweit und betrifft auch andere Apps im selben Projekt; Aktivierung ist risikolos und wird empfohlen, falls dort Passwörter genutzt werden (laut Supabase-Doku ab Pro-Plan). Nicht durch diesen PR geändert. |
-| CORS | Nur `WEB_KIT_ADMIN_ORIGIN` (Standard `https://mikefaehch.github.io`); fremde Origins → 403. Requests ohne Origin brauchen trotzdem ein gültiges Admin-JWT. |
+| CORS | Ausschliesslich die exakt konfigurierte, kanonische HTTPS-Origin in `WEB_KIT_ADMIN_ORIGIN`; kein Fallback auf GitHub Pages. Fehlende/ungültige Konfiguration → 503; fehlender oder abweichender Origin-Header → 403. |
 
 ## Bekannte Restrisiken
 - Ein Funktionsabbruch zwischen `claim` und `finish` hinterlässt `pending`; der Eintrag zählt zum Rate-Limit und blockiert die Request-ID (sicher, aber manuell zu prüfen).
