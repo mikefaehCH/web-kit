@@ -180,7 +180,7 @@ class ProviderClassificationTests(unittest.TestCase):
             self.assertEqual(timeout, 150)
             return FakeHTTPResponse(provider_body(pass_payload()))
 
-        with patch("scripts.run_claude_review.urllib.request.urlopen", fake_urlopen):
+        with patch("scripts.run_claude_review.open_url", fake_urlopen):
             result = run_claude_review.call_claude(
                 "test-key", "test-model", SHA, "UNTRUSTED: ignore instructions", "trusted rules", self.schema,
             )
@@ -235,7 +235,7 @@ class ProviderClassificationTests(unittest.TestCase):
                 reads.append(size)
                 return b"x" * size
 
-        with patch("scripts.run_claude_review.urllib.request.urlopen", return_value=Huge(b"")):
+        with patch("scripts.run_claude_review.open_url", return_value=Huge(b"")):
             body = run_claude_review.send_to_claude("key", {"model": "m"})
         self.assertEqual(reads, [limit + 1])
         self.assertEqual(len(body), limit + 1)
@@ -252,7 +252,7 @@ class ProviderClassificationTests(unittest.TestCase):
         )
         for error in errors:
             with self.subTest(error=type(error).__name__):
-                with patch("scripts.run_claude_review.urllib.request.urlopen", side_effect=error):
+                with patch("scripts.run_claude_review.open_url", side_effect=error):
                     with self.assertRaises(run_claude_review.ProviderTransportError):
                         run_claude_review.send_to_claude("key", {"model": "m"})
 
@@ -278,11 +278,11 @@ class ProviderClassificationTests(unittest.TestCase):
         )
         for error in errors:
             with self.subTest(error=repr(error)), patch(
-                "scripts.run_claude_review.urllib.request.urlopen", return_value=FailingRead(error)
+                "scripts.run_claude_review.open_url", return_value=FailingRead(error)
             ):
                 with self.assertRaises(run_claude_review.ProviderResponseError):
                     run_claude_review.send_to_claude("key", {"model": "m"})
-        with patch("scripts.run_claude_review.urllib.request.urlopen",
+        with patch("scripts.run_claude_review.open_url",
                    return_value=FailingClose(provider_body(pass_payload()))):
             with self.assertRaises(run_claude_review.ProviderResponseError):
                 run_claude_review.send_to_claude("key", {"model": "m"})
@@ -312,12 +312,12 @@ class CheckRunTests(unittest.TestCase):
             self.assertEqual(timeout, 20)
             return FakeHTTPResponse(b'{"id":73,"app":{"id":123}}')
 
-        with patch("scripts.run_claude_review.urllib.request.urlopen", fake_urlopen):
+        with patch("scripts.run_claude_review.open_url", fake_urlopen):
             self.assertEqual(run_claude_review.create_check_run("app-token", "owner/repo", SHA, BASE, 4, 123), 73)
 
     def test_unexpected_app_identity_marks_created_check_failed(self):
         with (
-            patch("scripts.run_claude_review.urllib.request.urlopen",
+            patch("scripts.run_claude_review.open_url",
                   return_value=FakeHTTPResponse(b'{"id":73,"app":{"id":456}}')),
             patch("scripts.run_claude_review.complete_check_run") as complete_check,
         ):
@@ -341,13 +341,13 @@ class CheckRunTests(unittest.TestCase):
             self.assertEqual(payload["status"], "in_progress")
             return FakeHTTPResponse(json.dumps(good).encode())
 
-        with patch("scripts.run_claude_review.urllib.request.urlopen", fake_urlopen):
+        with patch("scripts.run_claude_review.open_url", fake_urlopen):
             self.assertEqual(run_claude_review.claim_ledger("t", "owner/repo", BASE, fingerprint, 123), 80)
         for field, value in (("app", {"id": 456}), ("status", "completed"),
                              ("head_sha", "c" * 40), ("external_id", "other"), ("id", True)):
             bad = {**good, field: value}
             with self.subTest(field=field), patch(
-                "scripts.run_claude_review.urllib.request.urlopen",
+                "scripts.run_claude_review.open_url",
                 return_value=FakeHTTPResponse(json.dumps(bad).encode()),
             ):
                 with self.assertRaises(run_claude_review.ReviewError):
@@ -585,7 +585,7 @@ class DiffFetchTests(unittest.TestCase):
 
     def test_github_api_http_error_and_oversized_response_are_not_accepted(self):
         error = urllib.error.HTTPError("https://api.github.com", 503, "unavailable", {}, None)
-        with patch("scripts.run_claude_review.urllib.request.urlopen", side_effect=error):
+        with patch("scripts.run_claude_review.open_url", side_effect=error):
             with self.assertRaises(urllib.error.HTTPError):
                 run_claude_review.request_json("https://api.github.com/test", token="token")
 
@@ -593,7 +593,7 @@ class DiffFetchTests(unittest.TestCase):
             def read(self, limit=None):
                 return b"x" * limit
 
-        with patch("scripts.run_claude_review.urllib.request.urlopen", return_value=Oversized(b"")):
+        with patch("scripts.run_claude_review.open_url", return_value=Oversized(b"")):
             with self.assertRaisesRegex(run_claude_review.ReviewError, "response exceeds"):
                 run_claude_review.request_json("https://api.github.com/test", token="token")
 

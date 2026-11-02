@@ -418,7 +418,7 @@ class LedgerGateTests(unittest.TestCase):
             patch.object(rcr, "request_json", self.gh.request_json),
             patch.object(rcr, "send_json", self.gh.send_json),
             patch.object(rcr, "read_trusted_policies", return_value="rules"),
-            patch("scripts.run_claude_review.urllib.request.urlopen", return_value=Response()),
+            patch("scripts.run_claude_review.open_url", return_value=Response()),
             contextlib.redirect_stdout(io.StringIO()),
         ):
             self.assertEqual(rcr.main(), 1)
@@ -487,7 +487,7 @@ class LedgerGateTests(unittest.TestCase):
             patch.object(rcr, "request_json", self.gh.request_json),
             patch.object(rcr, "send_json", self.gh.send_json),
             patch.object(rcr, "read_trusted_policies", return_value="rules"),
-            patch("scripts.run_claude_review.urllib.request.urlopen", raising_urlopen),
+            patch("scripts.run_claude_review.open_url", raising_urlopen),
             contextlib.redirect_stdout(io.StringIO()),
         ):
             self.assertEqual(rcr.main(), 1)
@@ -507,7 +507,7 @@ class LedgerGateTests(unittest.TestCase):
             patch.object(rcr, "request_json", self.gh.request_json),
             patch.object(rcr, "send_json", self.gh.send_json),
             patch.object(rcr, "read_trusted_policies", return_value="rules"),
-            patch("scripts.run_claude_review.urllib.request.urlopen", urlopen),
+            patch("scripts.run_claude_review.open_url", urlopen),
             contextlib.redirect_stdout(io.StringIO()),
         ):
             return rcr.main()

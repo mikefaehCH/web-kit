@@ -82,6 +82,42 @@ class ProviderResponseError(ReviewError):
     """
 
 
+class RedirectRefused(urllib.error.HTTPError):
+    """A 3xx answer to a credentialed request; the target is never contacted."""
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect instead of re-sending the request elsewhere.
+
+    The default handler would follow 301/302/303 (and 307/308 for GET) and copy
+    all headers except Content-Type/Content-Length, including ``Authorization``
+    and ``x-api-key``, to an arbitrary target host.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise RedirectRefused(req.full_url, code, "redirect refused for credentialed request",
+                              headers, fp)
+
+
+# All credentialed requests go through this opener; it never follows redirects.
+_CREDENTIALED_OPENER = urllib.request.build_opener(_NoRedirectHandler())
+
+
+def open_url(request: urllib.request.Request, timeout: float):
+    """Open a credentialed request without following redirects.
+
+    Any 3xx raises RedirectRefused (an HTTPError); 3xx responses that are not
+    handled as redirects are refused as well, so no 3xx is ever returned.
+    """
+    response = _CREDENTIALED_OPENER.open(request, timeout=timeout)
+    status = getattr(response, "status", None)
+    if type(status) is int and 300 <= status < 400:
+        response.close()
+        raise RedirectRefused(request.full_url, status, "redirect refused for credentialed request",
+                              getattr(response, "headers", None), None)
+    return response
+
+
 def github_headers(token: str, *, json_body: bool = False,
                    accept: str = "application/vnd.github+json") -> dict[str, str]:
     headers = {
@@ -97,7 +133,7 @@ def github_headers(token: str, *, json_body: bool = False,
 def request_json(url: str, *, token: str, accept: str = "application/vnd.github+json") -> Any:
     request = urllib.request.Request(url, headers=github_headers(token, accept=accept))
     response_limit = MAX_DIFF_BYTES if accept.endswith(".diff") else MAX_REVIEW_CONTEXT_BYTES
-    with urllib.request.urlopen(request, timeout=20) as response:
+    with open_url(request, timeout=20) as response:
         body = response.read(response_limit + 1)
     if len(body) > response_limit:
         raise ReviewError("GitHub API response exceeds the configured review limit")
@@ -113,7 +149,7 @@ def send_json(url: str, *, token: str, method: str, payload: dict[str, Any]) -> 
         method=method,
         headers=github_headers(token, json_body=True),
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
+    with open_url(request, timeout=20) as response:
         body = response.read(32_001)
     if len(body) > 32_000:
         raise ReviewError("GitHub API response exceeds the configured limit")
@@ -497,7 +533,7 @@ def send_to_claude(api_key: str, payload: dict[str, Any]) -> bytes:
     - Before a successful response exists (connection, TLS, timeout while
       waiting, HTTP error status): ProviderTransportError, retryable. No model
       output can have been delivered.
-    - Once ``urlopen`` returned a successful response, any failure while
+    - Once ``open_url`` returned a successful response, any failure while
       reading or closing its body (IncompleteRead, read timeout, reset, unknown
       length) is a ProviderResponseError and therefore a sticky non-pass,
       even with partial bytes, because the model may already have produced
@@ -514,7 +550,7 @@ def send_to_claude(api_key: str, payload: dict[str, Any]) -> bytes:
         },
     )
     try:
-        response = urllib.request.urlopen(request, timeout=150)
+        response = open_url(request, timeout=150)
     except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as exc:
         # urllib.error.HTTPError is a URLError: an HTTP error status carries no
         # model output, so it is treated as retryable transport failure.
