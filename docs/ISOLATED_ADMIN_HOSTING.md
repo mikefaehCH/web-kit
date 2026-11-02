@@ -15,3 +15,9 @@ Ziel: `admin/` auf einer separaten HTTPS-Origin hosten, **nicht** unter `mikefae
 ## Restrisiken
 
 Eine separate Origin isoliert Web Storage und Auth-Sitzung von anderen GitHub-Pages-Sites, ersetzt aber keine serverseitige Admin-Autorisierung. Supabase-RPCs bleiben service_role-only. Tokens gehören niemals in HTML, Repository oder Build-Logs. `render.yaml` enthält keine Secrets.
+
+## Restrisiko und nächste technische Härtung
+
+Die CSP erlaubt vorläufig `https://esm.sh`, da `admin/auth.js` Supabase-JavaScript dort lädt. Das ist **keine** vollständige Absicherung gegen eine kompromittierte CDN-Abhängigkeit. Vor dem Live-Rollout die Bibliothek reproduzierbar und lokal bereitstellen, CSP auf `script-src 'self'` einschränken und den Login mit PKCE im Browser end-to-end testen.
+
+Das Edge-Function-Verhalten bleibt separat zu härten: `WEB_KIT_ADMIN_ORIGIN` darf **keinen** GitHub-Pages-Fallback besitzen. Ohne Konfiguration muss die Funktion fail-closed antworten. Das ist eine Backend-Änderung, kein reines Hosting-Header-Thema.
