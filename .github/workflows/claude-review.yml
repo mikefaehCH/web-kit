@@ -1,5 +1,7 @@
 name: Claude independent technical review (opt-in)
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -9,20 +11,25 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
   issues: read
+  id-token: write
 
 concurrency:
-  group: claude-review-${{ inputs.pr_number }}
+  group: claude-review-${{ github.event.pull_request.number || inputs.pr_number }}
   cancel-in-progress: true
 
 jobs:
   review:
     # Disabled until the owner confirms an enforced provider-side spend cap.
-    if: ${{ vars.CLAUDE_REVIEW_ENABLED == 'true' }}
+    if: ${{ vars.CLAUDE_REVIEW_ENABLED == 'true' && github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Checkout pinned workflow branch for review context
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Validate PR scope and record exact SHA
         id: scope
         env:
