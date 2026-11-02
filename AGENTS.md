@@ -3,7 +3,7 @@
 GitHub ist die verbindliche Quelle. Dieses Repository ist derzeit ein Gerüst auf `main`; der Website-Generator und dessen Tests sind noch nicht produktiv integriert. Bestehende PRs (insbesondere WhatsApp-Admin) sind unabhängige Arbeiten und dürfen nicht ungeprüft gemergt werden.
 
 ## Autonome Umsetzung
-- ChatGPT/Codex implementiert auf Aufgabenbranches und per PR; Claude oder ein unabhängiger Reviewer prüft sicherheits- oder produktionsrelevante Änderungen am konkreten HEAD.
+- ChatGPT/Codex implementiert auf Aufgabenbranches und per PR; Claude oder ein unabhängiger Reviewer prüft sicherheits- oder produktionsrelevante Änderungen am konkreten HEAD. Ein automatischer Claude-PASS darf die menschliche Approval erst ersetzen, wenn der fail-closed Pflichtcheck implementiert, getestet und im Branchschutz verbindlich aktiviert ist; bis dahin gelten die bisherigen Freigaben.
 - Vor Arbeitsbeginn `main`, offene Issues/PRs, Branches, bestehende Regeln und CI überprüfen. Doppelarbeit vermeiden.
 - Ein durch den Product Owner freigegebener Auftrag deckt Implementierung, Tests, Korrekturen, PR, Review, Merge und Deployment **innerhalb des vereinbarten Umfangs** ab. Keine erneute Freigabeschleife für technische Zwischenschritte.
 - Kein direkter Push auf `main`, kein Force-Push, keine Umgehung von Branchschutz oder Pflichtchecks.
