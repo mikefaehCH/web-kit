@@ -6,7 +6,6 @@ on:
       - 'scripts/inventory*.mjs'
       - 'tests/inventory.test.mjs'
       - 'platform/projects.json'
-      - 'package.json'
       - '.github/workflows/platform-inventory.yml'
   push:
     branches: [main]
@@ -14,7 +13,6 @@ on:
       - 'scripts/inventory*.mjs'
       - 'tests/inventory.test.mjs'
       - 'platform/projects.json'
-      - 'package.json'
       - '.github/workflows/platform-inventory.yml'
   workflow_dispatch:
 
@@ -33,4 +31,4 @@ jobs:
         with:
           node-version: '22'
       - name: Reproducible offline inventory tests
-        run: npm test
+        run: node --test tests/inventory.test.mjs
