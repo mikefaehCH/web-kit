@@ -6,6 +6,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 jobs:
   guarded-merge:
     if: ${{ github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success' }}
@@ -26,13 +27,20 @@ jobs:
               .head.sha==$sha and .head.repo.full_name==.base.repo.full_name and
               (.body // "" | test("(?m)^Autonomy-Release: true$"))
             ' pr.json >/dev/null || continue
-            # Only simple README edits may merge with scaffold-only checks.
-            changed=$(gh api --paginate "repos/$GH_REPO/pulls/$pr/files?per_page=100" --jq '.[].filename')
-            if echo "$changed" | grep -Ev '^(README|AGENTS|RELEASE_POLICY)\.md$' >/dev/null; then
-              echo "Not docs-only; no generator quality gate yet."
+            # Only README.md edits may merge with scaffold-only checks (AGENTS.md, RELEASE_POLICY.md §7).
+            # Rule files (AGENTS.md, RELEASE_POLICY.md) and everything else need independent review.
+            # Renames/removals are never README-only: a rename AGENTS.md -> README.md would otherwise delete
+            # a rule file while the files API only reports the new name. Also emit previous_filename.
+            changed=$(gh api --paginate "repos/$GH_REPO/pulls/$pr/files?per_page=100" \
+              --jq '.[] | (if (.status=="modified" or .status=="added") then .filename else "DISALLOWED:\(.status):\(.filename)" end), (.previous_filename // empty)')
+            if [ -z "$changed" ] || echo "$changed" | grep -Ev '^README\.md$' >/dev/null; then
+              echo "Not README-only; independent review required."
               continue
             fi
             # README-only low-risk edits are covered by the scoped owner opt-in and CI.
             # All other paths are rejected above and require independent review.
-            gh api -X PUT "repos/$GH_REPO/pulls/$pr/merge" -f merge_method=squash -f sha="$RUN_SHA"
+            merged=$(gh api -X PUT "repos/$GH_REPO/pulls/$pr/merge" -f merge_method=squash -f sha="$RUN_SHA" --jq '.merged')
+            if [[ "$merged" == "true" ]]; then
+              gh workflow run "Web-kit quality" --ref main
+            fi
           done
