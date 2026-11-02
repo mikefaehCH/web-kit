@@ -20,10 +20,17 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Require explicit activation and budget configuration
-        if: ${{ vars.CLAUDE_REVIEW_ENABLED != 'true' || vars.CLAUDE_REVIEW_BUDGET_APPROVED != 'true' }}
+        id: activation
+        env:
+          CLAUDE_REVIEW_ENABLED: ${{ vars.CLAUDE_REVIEW_ENABLED }}
+          CLAUDE_REVIEW_BUDGET_APPROVED: ${{ vars.CLAUDE_REVIEW_BUDGET_APPROVED }}
+        shell: bash
         run: |
-          echo "Claude review is not activated with a confirmed provider-side spend limit."
-          exit 1
+          set -euo pipefail
+          if [[ "$CLAUDE_REVIEW_ENABLED" != "true" || "$CLAUDE_REVIEW_BUDGET_APPROVED" != "true" ]]; then
+            echo "Claude review is not activated with a confirmed provider-side spend limit."
+            exit 1
+          fi
 
       - name: Validate PR scope and capture immutable SHAs
         id: scope
@@ -93,7 +100,7 @@ jobs:
             --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git show:*),Bash(git log:*)"
 
       - name: Require unchanged PR HEAD and a valid PASS verdict
-        if: ${{ always() }}
+        if: ${{ always() && steps.activation.outcome == 'success' && steps.scope.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

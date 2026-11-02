@@ -69,5 +69,15 @@ class WorkflowSafetyTests(unittest.TestCase):
             workflow,
         )
 
+    def test_budget_guard_fails_closed_without_running_sha_validator(self):
+        workflow = Path(".github/workflows/claude-review.yml").read_text(encoding="utf-8")
+        self.assertIn("id: activation", workflow)
+        self.assertIn('"$CLAUDE_REVIEW_ENABLED" != "true"', workflow)
+        self.assertIn('"$CLAUDE_REVIEW_BUDGET_APPROVED" != "true"', workflow)
+        self.assertIn(
+            "if: ${{ always() && steps.activation.outcome == 'success' && steps.scope.outcome == 'success' }}",
+            workflow,
+        )
+
 if __name__ == "__main__":
     unittest.main()
