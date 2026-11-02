@@ -9,10 +9,11 @@ const confirm=document.querySelector('#confirm');
 const cancel=document.querySelector('#cancel');
 const status=document.querySelector('#status');
 let pending=false;
+let requestKey=null;
 const endpoint=window.WEB_KIT_WHATSAPP_ENDPOINT;
 const getToken=window.WEB_KIT_GET_ACCESS_TOKEN;
-message.addEventListener('input',()=>{count.textContent=String(message.value.length);send.disabled=!message.value.trim()||pending;review.hidden=true;status.textContent='';});
-form.addEventListener('submit',event=>{event.preventDefault();if(!message.value.trim()||pending)return;preview.textContent=message.value;review.hidden=false;confirm.focus();});
+message.addEventListener('input',()=>{count.textContent=String(message.value.length);send.disabled=!message.value.trim()||pending;review.hidden=true;requestKey=null;status.textContent='';});
+form.addEventListener('submit',event=>{event.preventDefault();if(!message.value.trim()||pending)return;preview.textContent=message.value;requestKey=crypto.randomUUID();review.hidden=false;confirm.focus();});
 cancel.addEventListener('click',()=>{review.hidden=true;send.focus();});
 confirm.addEventListener('click',async()=>{
   if(pending||review.hidden||!message.value.trim())return;
@@ -23,7 +24,7 @@ confirm.addEventListener('click',async()=>{
   try{
     const token=await getToken();
     if(!token)throw new Error('Bitte zuerst als Administrator anmelden.');
-    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({message:message.value})});
+    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({message:message.value,requestKey})});
     if(!response.ok)throw new Error('Versand fehlgeschlagen (HTTP '+response.status+').');
     status.textContent='Nachricht an Camino gesendet.';message.value='';count.textContent='0';review.hidden=true;
   }catch(error){status.textContent=error instanceof Error?error.message:'Versand fehlgeschlagen.';}
