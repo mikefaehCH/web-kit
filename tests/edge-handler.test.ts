@@ -194,12 +194,28 @@ test("keine Secrets oder Nachrichtentexte in Antworten und Logs", async () => {
 
 
 test("fehlende oder ungueltige Admin-Origin blockiert alle Requests ohne Versand", async () => {
-  for (const value of [undefined, "", "http://insecure.example", "https://example.com/path"]) {
+  for (const value of [
+    undefined,
+    "",
+    "http://insecure.example",
+    "https://example.com/path",
+    "https://example.com/",
+    "https://example.com?query=1",
+    "https://user@example.com",
+    "https://example.com:443",
+    "https://example.com:8443",
+    "https://..example.com",
+    "https://example..com",
+    "https://-bad.example.com",
+    "https://bad-.example.com",
+    " https://example.com",
+    "https://EXAMPLE.com",
+  ]) {
     const t = setup({ env: { WEB_KIT_ADMIN_ORIGIN: value } });
     const res = await handle(req(ok), t.deps);
     assert.equal(res.status, 503);
     assert.equal(t.fetches.length + t.rpc.length, 0);
-    assert.notEqual(res.headers.get("access-control-allow-origin"), "https://mikefaehch.github.io");
+    assert.equal(res.headers.get("access-control-allow-origin"), "null");
   }
 });
 
