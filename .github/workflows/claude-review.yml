@@ -44,6 +44,16 @@ jobs:
           ' /tmp/review-pr.json >/dev/null
           sha=$(jq -r '.head.sha' /tmp/review-pr.json)
           echo "head_sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Checkout exact PR HEAD for source inspection
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.scope.outputs.head_sha }}
+          persist-credentials: false
+      - name: Assert checked-out commit is PR HEAD
+        env:
+          EXPECTED: ${{ steps.scope.outputs.head_sha }}
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
       - name: Review with Claude (advisory, not a GitHub approval)
         uses: anthropics/claude-code-action@v1
         with:
