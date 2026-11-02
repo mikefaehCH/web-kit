@@ -1,9 +1,9 @@
 # Web-Kit WhatsApp sender
 
-This function is not deployed by this PR. Deploy after independent review and confirmation of server-side admin roles.
+`index.ts` verdrahtet Supabase-Clients und `Deno.serve`; die Logik liegt in `handler.ts` (Tests: `tests/edge-handler.test.ts`). Beim Deploy beide Dateien hochladen, `verify_jwt` = true.
 
-Required Supabase Edge Function secrets: GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_HOST, WEB_KIT_ADMIN_ORIGIN. Never commit secrets.
+Secrets (Edge Function): `GREEN_API_TOKEN`, optional `GREEN_API_INSTANCE_ID`, `GREEN_API_HOST`, `WEB_KIT_ADMIN_ORIGIN`. Von Supabase bereitgestellt: `SUPABASE_URL`, `SUPABASE_ANON_KEY` (Token-Prüfung), `SUPABASE_SERVICE_ROLE_KEY` (nur für `web_kit_whatsapp_claim`/`_finish`). Nie committen.
 
-The caller must be a valid Supabase user with trusted app_metadata.web_kit_admin === true. The browser supplies only the message; the destination group is fixed server-side.
+Antworten: 200 accepted · 400 Eingabe · 401 Session · 403 Origin/kein Admin · 429 Duplikat/Limit · 502 Provider lehnt ab (nicht gesendet) · 503 nicht konfiguriert/Versandkontrolle nicht verfügbar · 504 Status unklar (nicht erneut senden, Gruppe prüfen).
 
-Before production: add durable per-admin rate limiting, delivery audit and idempotency, test non-admin 403, missing secrets 503, invalid body 400 and authorized test send. Provider acceptance does not guarantee delivery.
+Details und Restrisiken: [`supabase/SECURITY.md`](../../SECURITY.md). Provider-Annahme garantiert keine Zustellung.
