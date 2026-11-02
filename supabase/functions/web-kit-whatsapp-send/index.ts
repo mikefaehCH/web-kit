@@ -27,7 +27,7 @@ Deno.serve(async(req)=>{
   const message=(body&&typeof body==="object"&&"message" in body)?(body as {message:unknown}).message:null;
   if(typeof message!=="string"||!message.trim()||message.length>MAX)return json({error:"Message must be 1–4000 characters"},400);
   const keyValue=(body&&typeof body==="object"&&"requestKey" in body)?(body as {requestKey:unknown}).requestKey:null;
-  if(typeof keyValue!=="string"||!^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(keyValue))return json({error:"Invalid request key"},400);
+  if(typeof keyValue!=="string"||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(keyValue))return json({error:"Invalid request key"},400);
   const bytes=new TextEncoder().encode(message.trim());
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes))).map(x=>x.toString(16).padStart(2,"0")).join("");
   const authClient=createClient(url,anon,{global:{headers:{Authorization:auth}},auth:{persistSession:false}});
