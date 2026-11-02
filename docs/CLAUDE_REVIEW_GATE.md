@@ -5,7 +5,7 @@ Status: **nicht produktiv aktiviert**. Die Workflow-Implementierung, grüne CI o
 ## Freigabemodell
 
 - Mike ist der alleinige Maintainer und trifft die ausdrückliche Merge-Entscheidung. Es wird keine menschliche GitHub-Approval vorgetäuscht.
-- ChatGPT und Claude liefern getrennte technische Prüfungen am exakten HEAD. Für Änderungen an Gate, Validator, Regeln oder Berechtigungen sind beide Prüfungen nötig.
+- ChatGPT/Codex und Claude können abwechselnd implementieren und gegenprüfen. Bei Änderungen am Gate, Validator, Regeln oder Berechtigungen genügt eine technische Gegenprüfung am exakten HEAD durch den jeweils nicht federführenden Agenten; Selbstprüfung zählt nicht. Mike prüft den Gesamtstand und entscheidet ausdrücklich über den Merge.
 - Eine menschliche Approval wird bei regulären PRs erst ersetzt, wenn der App-Check live PASS und blockierenden FAIL nachgewiesen hat und im Ruleset mit festgelegter App-Quelle, aktueller Basis und ohne Bypass verbindlich erzwungen wird. Bis dahin gilt die Approval-Regel. Für PR #9, der das Gate einführt, gilt die eng begrenzte Bootstrap-Ausnahme aus `RELEASE_POLICY.md`: zwei getrennte technische Reviews, keine offenen Findings, grüne CI und Mikes bewusste Merge-Entscheidung bei null erforderlichen Approvals. Die Ausnahme erlischt mit dem Merge von PR #9.
 - Das Modell kann durch adversariale Inhalte fehlgeleitet werden. Das Gate reduziert dieses Risiko, beseitigt es aber nicht; ein PASS ist kein Beweis menschlicher Unfehlbarkeit oder unabhängiger menschlicher Prüfung.
 
