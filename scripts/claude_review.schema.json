@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "reviewed_sha", "summary", "findings", "security_findings"],
+  "properties": {
+    "verdict": {"type": "string", "enum": ["PASS", "FAIL", "INCONCLUSIVE"]},
+    "reviewed_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "summary": {"type": "string", "minLength": 1},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "file", "line", "description"],
+        "properties": {
+          "severity": {"type": "string", "enum": ["critical", "high", "medium", "low", "info"]},
+          "file": {"type": "string"},
+          "line": {"type": ["integer", "null"], "minimum": 1},
+          "description": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "security_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "file", "line", "description"],
+        "properties": {
+          "severity": {"type": "string", "enum": ["critical", "high", "medium", "low", "info"]},
+          "file": {"type": "string"},
+          "line": {"type": ["integer", "null"], "minimum": 1},
+          "description": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

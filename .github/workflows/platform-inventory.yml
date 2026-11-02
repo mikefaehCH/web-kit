@@ -1,0 +1,55 @@
+name: Platform inventory tests
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/inventory*.mjs'
+      - 'tests/inventory.test.mjs'
+      - 'platform/projects.json'
+      - '.github/workflows/platform-inventory.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/inventory*.mjs'
+      - 'tests/inventory.test.mjs'
+      - 'platform/projects.json'
+      - '.github/workflows/platform-inventory.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (pinned)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Node.js 22 (pinned)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Reproducible offline inventory tests
+        run: node --test tests/inventory.test.mjs
+
+  live-inventory:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout (pinned)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Node.js 22 (pinned)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Collect public repository metrics (read only)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/inventory.mjs reports/current.json reports/current.md
+          cat reports/current.md >> "$GITHUB_STEP_SUMMARY"
+          cat reports/current.md

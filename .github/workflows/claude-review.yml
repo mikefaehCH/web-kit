@@ -1,0 +1,62 @@
+name: Claude review
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, edited]
+
+# This workflow is loaded from the trusted base branch. It never checks out or
+# executes pull-request code; the diff is fetched as untrusted text by the runner.
+# Enforcement must require the `Claude review` check from the dedicated GitHub
+# App as its expected source; a name-only status requirement is insufficient.
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  review:
+    name: Review (trusted runner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    if: ${{ github.event.pull_request.draft == false && (github.event.action != 'edited' || github.event.changes.base != null) }}
+    # Serialize all reviews against the same base commit so identical review
+    # fingerprints cannot be evaluated in parallel. Job-level (not workflow-level)
+    # so skipped runs (drafts, title edits) never occupy or replace a queue slot.
+    # Liveness limit: GitHub keeps at most one pending job per group; a newer
+    # pending job replaces an older pending one, which then creates no check.
+    # The PR stays blocked (missing required check) until it is re-triggered.
+    concurrency:
+      group: claude-review-${{ github.repository }}-${{ github.event.pull_request.base.sha }}
+      cancel-in-progress: false
+    environment: claude-review
+    steps:
+      - name: Check out trusted base revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Create repository-scoped check-run token
+        id: review-app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.CLAUDE_REVIEW_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CLAUDE_REVIEW_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: web-kit
+          permission-checks: write
+
+      - name: Review exact PR diff
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_REVIEW_ENABLED: ${{ vars.CLAUDE_REVIEW_ENABLED }}
+          CLAUDE_REVIEW_BUDGET_APPROVED: ${{ vars.CLAUDE_REVIEW_BUDGET_APPROVED }}
+          CLAUDE_REVIEW_APP_ID: ${{ vars.CLAUDE_REVIEW_APP_ID }}
+          GH_TOKEN: ${{ github.token }}
+          CHECKS_TOKEN: ${{ steps.review-app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_BASE: ${{ github.event.pull_request.base.sha }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          CLAUDE_MODEL: claude-sonnet-5
+        run: python3 scripts/run_claude_review.py

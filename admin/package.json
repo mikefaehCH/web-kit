@@ -1,0 +1,15 @@
+{
+  "name": "web-kit-admin-assets",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Reproducible local Supabase browser bundle for the isolated Web-Kit admin.",
+  "scripts": {
+    "build:vendor": "esbuild vendor-entry.js --bundle --format=esm --platform=browser --target=es2022 --minify --legal-comments=external --outfile=vendor/supabase.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
