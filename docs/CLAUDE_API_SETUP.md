@@ -4,7 +4,7 @@
 
 Das Gate ist **nicht aktiviert**, solange der App-Check nicht erfolgreich live getestet und im `Protect main`-Ruleset mit genau dieser App als Quelle erforderlich ist. Der Ruleset muss die Basis aktuell halten (`strict_required_status_checks_policy: true`). Die vier vorhandenen CI-Checks bleiben erforderlich. Es gibt keinen Bypass.
 
-Vor einem bezahlten Aufruf muss in Anthropic ein tatsächlich wirksames Workspace-Ausgabenlimit von höchstens CHF 10 pro Monat (oder der tiefere Betrag mit Sicherheitsmarge in der Abrechnungswährung) eingerichtet und verifiziert sein. `CLAUDE_REVIEW_BUDGET_APPROVED=true` ist nur ein Workflow-Opt-in, kein Provider-Limit. Der Runner vermeidet Wiederholungsaufrufe für denselben erfolgreichen PR-HEAD und dieselbe Basis-SHA; jeder neue HEAD kann Kosten verursachen. Drafts werden übersprungen.
+Vor einem bezahlten Aufruf muss in Anthropic ein tatsächlich wirksames Workspace-Ausgabenlimit von höchstens USD 10 pro Monat (oder der tiefere Betrag mit Sicherheitsmarge in der Abrechnungswährung) eingerichtet und verifiziert sein. Der Betreiber hat ein Organisationslimit von USD 20 und ein Workspace-Limit von USD 10 für `web-kit-reviews` bestätigt. `CLAUDE_REVIEW_BUDGET_APPROVED=true` ist nur ein Workflow-Opt-in, kein Provider-Limit. Der Runner vermeidet Wiederholungsaufrufe für denselben erfolgreichen PR-HEAD und dieselbe Basis-SHA; jeder neue Review-Kontext kann Kosten verursachen. Drafts werden übersprungen.
 
 ## Secrets in einem geschützten Environment
 
@@ -28,20 +28,21 @@ Der vertrauenswürdige `pull_request_target`-Job läuft auf der Basis-Ref `main`
 ## Workflow-Schutz und vollständiger Diff
 
 - Workflow und Skript werden aus dem vertrauenswürdigen Basis-Commit ausgeführt. Die Berechtigungen des Workflow-Tokens sind auf `contents: read` und `pull-requests: read` begrenzt; der App-Token ist nur für dieses Repository und `checks: write` bestimmt.
-- Der Runner liest jede geänderte Datei über die paginierte Pull-Request-Files-API. Fehlt bei einer Datei ein Text-Patch (z. B. binär oder zu gross), stimmt die Dateizahl nicht oder wird das Gesamtlimit überschritten, blockiert er als unvollständige Review.
-- Der serialisierte Diff wird als nicht vertrauenswürdiger Inhalt an Claude gesendet. Claude erhält keine Tools oder Zugangsdaten.
-- Der Runner überspringt Draft-PRs und cached einen erfolgreichen App-Check nur für identische PR-, HEAD-, Basis- und App-IDs. Ein neuer HEAD oder eine neue Basis-SHA erfordert eine neue Prüfung.
+- Der Runner liest jede geänderte Datei über die paginierte Pull-Request-Files-API und lädt ihren vollständigen Inhalt aus dem exakten HEAD (gelöschte Dateien aus der Basis). Fehlt bei einer Datei ein Text-Patch oder Textinhalt (z. B. binär oder zu gross), stimmt die Dateizahl nicht oder wird das Kontextlimit überschritten, blockiert er als unvollständige Review.
+- Der serialisierte Diff plus vollständige Dateiinhalte werden als nicht vertrauenswürdiger Inhalt an Claude gesendet. Claude erhält keine Tools oder Zugangsdaten.
+- Der Runner überspringt Draft-PRs und cached einen erfolgreichen App-Check nur für identische PR-, HEAD-, Basis- und App-IDs. Ein nicht-passendes strukturiertes Modellurteil wird als PR-unabhängiger App-eigener Check-Fingerprint am unveränderlichen Basis-Commit gespeichert; identischer Inhalt auf derselben Basis kann auch unter einer neuen PR nicht erneut bewertet werden. Ein neuer Review-Kontext oder eine neue Basis-SHA erfordert eine neue Prüfung.
+- Der App-Check wird vor dem Einlesen der PR-Metadaten und Dateien erstellt. Fehler beim vollständigen Diff werden so als sichtbarer fehlgeschlagener Check abgeschlossen.
 - Unerwartete Antwortformen, HTTP-/JSON-/Timeout-Fehler und sonstige Ausnahmen führen fail-closed zu einem fehlgeschlagenen App-Check; geheime Werte und Modellantworten werden nicht geloggt.
 - Die Modell-ID `claude-sonnet-5` ist gültig. Die API unterstützt `output_config.format` mit JSON Schema und Union-Typen. Ein echter Live-Aufruf bleibt dennoch Voraussetzung für die Abnahme.
 
 ## Abnahme
 
-1. Provider-Ausgabenlimit, Environment-Branch-Regel, Environment-Secrets/-Variablen, App-Installation und App-ID prüfen.
+1. Provider-Ausgabenlimit, Environment-Branch-Regel, Environment-Secrets/-Variablen, App-Installation und App-ID prüfen. Der Betreiber bestätigt: Repository-Secrets und -Variablen wurden entfernt, alte App/API-Schlüssel widerrufen, das Workspace-Limit gesetzt und die Budgetfreigabe erteilt. `CLAUDE_REVIEW_ENABLED` bleibt bis zur kontrollierten Aktivierung auf `false`.
 2. Unit-, Integrations- und adversariale Tests ausführen.
 3. Nach Merge des vertrauenswürdigen Workflows kontrollierte Test-PRs verwenden: einen gültigen PASS nachweisen und einen absichtlich blockierenden FAIL nachweisen. Keine echten Nachrichten, produktiven Daten oder sonstigen Seiteneffekte verwenden.
 4. Einen namensgleichen Check von einer anderen Quelle versuchen; er darf den erwarteten App-Check nicht erfüllen.
 5. `Protect main` erneut auslesen: alle vier CI-Checks plus App-gebundener `Claude review`, erwartete App-Quelle, aktuelle Basis, null Approval-Anforderung im Solo-Maintainer-Modell, keine Bypass-Akteure.
-6. Gate erst nach diesen Nachweisen als aktiv dokumentieren.
+6. Gate erst nach diesen Nachweisen als aktiv dokumentieren. Aktuell ist der Gate-Workflow noch nicht auf `main`; `Protect main` verlangt noch nicht den App-gebundenen Claude-Check und erzwingt keine aktuelle Basis. Der Gate-Status bleibt inaktiv.
 
 Ein LLM kann durch adversariale Inhalte beeinflusst werden; strukturierte Ausgabe und Prompt-Injection-Abwehr reduzieren das Risiko, beweisen aber keine Unfehlbarkeit. Für Änderungen am Gate, Validator, Ruleset oder an Berechtigungen sind separate Claude- und ChatGPT-Reviews am exakten HEAD und die ausdrückliche Merge-Entscheidung des alleinigen Maintainers erforderlich. Das sind technische Reviews, keine GitHub-Approvals.
 
