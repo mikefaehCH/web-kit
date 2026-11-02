@@ -24,10 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout pinned workflow branch for review context
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
       - name: Validate PR scope and record exact SHA
         id: scope
         env:
