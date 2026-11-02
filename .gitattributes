@@ -1,0 +1,2 @@
+# Bundled upstream JS retains a meaningful whitespace character in a parser lookup string.
+admin/vendor/supabase.js whitespace=-blank-at-eol

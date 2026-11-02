@@ -13,6 +13,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Build and verify pinned local Supabase bundle
+        run: |
+          npm ci --prefix admin --ignore-scripts
+          npm run --prefix admin build:vendor
+          git diff --exit-code -- admin/vendor/supabase.js
+          node admin/build-static.mjs
+          node --input-type=module -e "import{readdirSync}from'node:fs';const f=readdirSync('admin/dist').sort();if(f.join(',')!=='auth.js,vendor,whatsapp.css,whatsapp.html,whatsapp.js'||readdirSync('admin/dist/vendor').sort().join(',')!=='LICENSES.txt,supabase.js')process.exit(1)"
       - run: node --check admin/whatsapp.js
       - run: node --test tests/whatsapp-static.mjs
 
