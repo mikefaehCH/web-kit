@@ -27,7 +27,7 @@ export type Deps = {
 
 export function corsHeaders(env: Deps["env"]): Record<string, string> {
   return {
-    "Access-Control-Allow-Origin": env("WEB_KIT_ADMIN_ORIGIN") || "https://mikefaehch.github.io",
+    "Access-Control-Allow-Origin": env("WEB_KIT_ADMIN_ORIGIN") || "null",
     "Access-Control-Allow-Headers": "authorization, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
@@ -45,7 +45,9 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
   const origin = req.headers.get("origin");
-  if (origin && origin !== cors["Access-Control-Allow-Origin"]) return json({ error: "Origin not allowed" }, 403);
+  const configuredOrigin = deps.env("WEB_KIT_ADMIN_ORIGIN");
+  if (!configuredOrigin || !/^https:\/\/[a-z0-9.-]+(?::443)?$/i.test(configuredOrigin)) return json({ error: "Admin origin not configured" }, 503);
+  if (!origin || origin !== configuredOrigin) return json({ error: "Origin not allowed" }, 403);
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
