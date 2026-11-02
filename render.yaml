@@ -4,7 +4,7 @@ services:
     runtime: static
     buildCommand: node admin/build-static.mjs
     staticPublishPath: ./admin/dist
-    autoDeployTrigger: off
+    autoDeployTrigger: checksPass
     headers:
       - path: /*
         name: X-Content-Type-Options
