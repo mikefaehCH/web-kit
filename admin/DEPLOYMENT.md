@@ -1,16 +1,22 @@
 # Admin und WhatsApp
 
-Admin-Einstieg: [https://web-kit-admin.onrender.com/whatsapp.html](https://web-kit-admin.onrender.com/whatsapp.html) auf einer dedizierten Render-Origin. **GitHub Pages ist dafür nicht zulässig**, da Pages-Projekte desselben Kontos dieselbe Browser-Origin teilen.
+Admin-Einstieg: [https://web-kit-admin.onrender.com/whatsapp.html](https://web-kit-admin.onrender.com/whatsapp.html) auf einer dedizierten Render-Origin. GitHub Pages ist dafür nicht zulässig, da Pages-Projekte desselben Kontos dieselbe Browser-Origin teilen.
 
-## Aktueller Produktionsstatus (02.11.2026)
+## Produktionsstatus laut Betreiberbericht (02.11.2026; nicht unabhängig verifiziert)
 
-- Render Static Site `web-kit-admin`, Service-ID `srv-dbkagf1srm7s739t6230`; Live-Deploy aus `main` bei Commit `76fb18d8bc00ff808206e84c6d16f80105f74e95`.
-- Build: `node admin/build-static.mjs`; Publish-Pfad: `admin/dist`. Render Auto-Deploy ist auf **After CI Checks Pass** gesetzt. Blueprint Auto-Sync bleibt pausiert; Blueprint-Änderungen werden manuell geprüft.
-- `WEB_KIT_ADMIN_ORIGIN` ist auf `https://web-kit-admin.onrender.com` gesetzt. Supabase Auth erlaubt exakt `https://web-kit-admin.onrender.com/whatsapp.html`; der veraltete Web-Kit-GitHub-Pages-Callback wurde entfernt. Die Site-URL und Camino-Redirects bleiben unverändert.
-- Edge Function `web-kit-whatsapp-send`: Version 6, `verify_jwt = true`.
-- Verifizierte Produktions-Smokes: Admin-HTML und Assets HTTP 200; Sicherheitsheader vorhanden; Supabase OPTIONS von der Render-Origin 204, fremde Origin 403, Request ohne JWT 401.
-- Das bestehende Betreiberkonto ist serverseitig mit `raw_app_meta_data.web_kit_admin = true` berechtigt. **Der Magic-Link-Login und die vollständige Admin-Oberfläche sind noch nicht end-to-end abgenommen.** Ein authentifizierter Nicht-Admin-Test und Tests auf iPhone/Safari/390 px stehen noch aus.
-- Keine echte WhatsApp-Nachricht wurde versendet. Keine produktive SQL-Migration wurde ausgeführt.
+Die folgenden Dashboard- und Produktionswerte sind Betreiberangaben und müssen bei Änderungen erneut direkt in Render bzw. Supabase geprüft werden:
+
+- Render Static Site `web-kit-admin`, Service-ID `srv-dbkagf1srm7s739t6230`; gemeldeter Deploy aus `main` bei Commit `76fb18d8bc00ff808206e84c6d16f80105f74e95`.
+- Build: `node admin/build-static.mjs`; Publish-Pfad: `admin/dist`. Der Render-Service soll auf **After CI Checks Pass** deployen; Blueprint Auto-Sync ist pausiert.
+- Gemeldete Supabase-Auth-Redirect-URL: `https://web-kit-admin.onrender.com/whatsapp.html`; die Supabase-Site-URL und Camino-Redirects sollen unverändert bleiben.
+- Gemeldeter Stand der Edge Function `web-kit-whatsapp-send`: Version 6, `verify_jwt = true`.
+- Gemeldete Smokes: Admin-HTML/Assets HTTP 200, Sicherheitsheader vorhanden, OPTIONS von der Render-Origin 204, fremde Origin 403 und Request ohne JWT 401.
+- Der Admin-Flag-Status ist in bisherigen Angaben widersprüchlich. Vor einer Funktionsabnahme muss das tatsächliche Konto in Supabase Auth geprüft werden.
+- Kein echter WhatsApp-Versand und keine produktive SQL-Migration sind für diese Angaben erfolgt.
+
+## Supabase Security Advisor
+
+Laut Advisor-Abfrage vom 02.11.2026 waren die früher erwähnten `0029`-Warnungen nicht mehr vorhanden. Gemeldet wurden stattdessen ein INFO-Befund `rls_enabled_no_policy` für `public.web_kit_whatsapp_dispatches` sowie die Warnung `auth_leaked_password_protection` (deaktiviert). Der RLS-Befund ist laut Betreiberbericht beabsichtigt; die Password-Protection-Warnung bleibt offen und ist projektweit zu bewerten, da Camino denselben Supabase-Auth-Dienst verwendet.
 
 ## Voraussetzungen für den Betrieb
 
@@ -32,11 +38,11 @@ Pro Admin und Stunde höchstens zehn Versandversuche. Jeder Request erhält eine
 
 1. Die Migration `20261102061405_web_kit_whatsapp_service_role_only` darf nicht erneut ausgeführt werden.
 2. Die Edge Function muss mit `index.ts` und `handler.ts` sowie `verify_jwt = true` deployt sein.
-3. Beim Security Advisor bleiben `0029`-Warnungen zu bereinigen; `0008` (RLS ohne Policies) bleibt bewusst.
+3. Security-Advisor-Warnungen sind anhand des oben datierten aktuellen Befunds zu bewerten; nicht pauschal von den früheren `0029`-Warnungen ausgehen.
 4. Tests ohne echten Versand: ohne JWT → 401, Nicht-Admin → 403, ungültiger Body → 400.
-5. Admin-Testkonto ist eingerichtet. Bis zur erfolgreichen Login- und Berechtigungsabnahme keinen echten Versand auslösen.
+5. Vor echter Nutzung Admin-Konto und Login end-to-end verifizieren. Bis dahin keinen echten Versand auslösen.
 
-Rollback: Edge Function v2 erneut deployen **und** alte Grants wiederherstellen ist bewusst nicht vorgesehen (würde Befund A wieder öffnen). Bei Problemen bleibt der Versand fail-closed, bis die gehärtete Version läuft.
+Rollback: Edge Function v2 erneut deployen und alte Grants wiederherstellen ist bewusst nicht vorgesehen (würde Befund A wieder öffnen). Bei Problemen bleibt der Versand fail-closed, bis die gehärtete Version läuft.
 
 ## Noch offene Abnahme
 
