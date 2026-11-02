@@ -1,34 +1,35 @@
 # Claude-Review-Gate und Solo-Maintainer-Freigabe
 
-Status: **Aufgabenbranch; nicht produktiv aktiviert.** Der Workflow-Code allein ersetzt weder eine Approval noch Branchschutz. Das Gate darf erst als verbindlich gelten, wenn der dedizierte GitHub-App-Check als erforderlicher Check mit genau dieser App als Quelle konfiguriert und live geprüft wurde.
+Status: **nicht produktiv aktiviert**. Die Workflow-Implementierung, grüne CI oder ein manuelles Claude-Ergebnis allein ersetzen weder den erforderlichen App-Check noch seine Durchsetzung im Ruleset.
 
 ## Freigabemodell
 
-- Mike ist der einzige Maintainer und trifft den abschliessenden Merge-Entscheid.
-- Claude und ChatGPT liefern technische Prüfungen; sie geben keine menschliche GitHub-Approval vor und dürfen keine solche vortäuschen.
-- Nach vollständiger Aktivierung kann ein erfolgreicher Claude-App-Check die bisherige Approval-Anforderung für normale PRs ersetzen. CI bleibt zusätzlich erforderlich. Gate-, Policy- oder Berechtigungsänderungen erhalten vor dem Merge zusätzlich eine separate ChatGPT- und Claude-Prüfung am exakten HEAD.
-- Bis Branchschutz und Live-Verhalten belegt sind, ist das Gate nicht aktiv. PRs bleiben blockiert, bis die im geltenden Ruleset verlangten Bedingungen erfüllt sind.
+- Mike ist der alleinige Maintainer und trifft die ausdrückliche Merge-Entscheidung. Es wird keine menschliche GitHub-Approval vorgetäuscht.
+- ChatGPT und Claude liefern getrennte technische Prüfungen am exakten HEAD. Für Änderungen an Gate, Validator, Regeln oder Berechtigungen sind beide Prüfungen nötig.
+- Für reguläre PRs kann der App-gebundene Claude-Check die Approval-Anforderung im Solo-Maintainer-Modell ersetzen, sobald er live geprüft und mit festgelegter App-Quelle verbindlich ist.
+- Das Modell kann durch adversariale Inhalte fehlgeleitet werden. Das Gate reduziert dieses Risiko, beseitigt es aber nicht; ein PASS ist kein Beweis menschlicher Unfehlbarkeit oder unabhängiger menschlicher Prüfung.
 
 ## Technischer Ablauf
 
-1. Der Workflow verwendet `pull_request_target` und wird aus dem vertrauenswürdigen Basisstand geladen. Er checkt nur den Basis-Commit aus; PR-Code wird weder ausgecheckt noch ausgeführt.
-2. Der Runner liest PR-Metadaten und den vollständigen Diff über die GitHub-API. Forks, geschlossene/falsch ausgerichtete PRs, zu grosse Diffs und SHA-Abweichungen werden abgelehnt.
-3. Der Diff wird als JSON-kodierter, nicht vertrauenswürdiger Text an die Messages API gesendet. Claude erhält keine Werkzeuge, Tokens oder anderen Zugangsdaten.
-4. Das Ergebnis muss dem Schema entsprechen. Nur `PASS`, leerer Findings-Listen, normaler API-Abschluss und exakt geprüfter HEAD können bestehen.
-5. Vor dem Erfolg werden PR-HEAD, PR-Basis und aktueller `main` erneut geprüft. Jede Änderung während des Reviews, API-/Parsingfehler, Timeout, fehlende Aktivierung oder unbekannter Zustand blockiert.
-6. Ein dediziertes, nur für `checks:write` berechtigtes GitHub App erstellt den Check `Claude review` auf dem exakten PR-HEAD. Der Actions-Workflow selbst veröffentlicht keinen gleichnamigen Commit-Status.
-7. Branchschutz muss `Claude review` als erforderlichen Statuscheck **mit der dedizierten App als erwarteter Quelle** verlangen. Ein Check gleicher Bezeichnung von GitHub Actions oder einem PR-Workflow darf nicht genügen.
+1. `pull_request_target` führt den Workflow aus dem vertrauenswürdigen Basis-Branch aus. Er checkt ausschliesslich den Basis-Commit aus, mit `persist-credentials: false`; PR-Code wird weder ausgeführt noch ausgecheckt.
+2. Das Workflow-Token hat nur `contents: read` und `pull-requests: read`. Ein dediziertes App-Token hat nur `checks: write` auf `web-kit`.
+3. API-Metadaten müssen Repository, Basisbranch, PR-Status, HEAD und Basis-SHA bestätigen. Der paginierte Files-Endpunkt muss exakt alle `changed_files` liefern und für jede Datei einen Text-Patch enthalten. Binärdateien, fehlende/trunkierte Patches, unvollständige Paginierung oder ein zu grosser Diff blockieren.
+4. Der Diff wird JSON-kodiert als feindlicher, nicht vertrauenswürdiger Text zusammen mit den vertrauenswürdigen Regeln an Claude übergeben. Claude hat keine Tools oder Secrets.
+5. Nur vollständiges strukturiertes `PASS`, leere Findings, korrekter HEAD und aktueller Basis-/Main-Stand erlauben Erfolg. `FAIL`, `INCONCLUSIVE`, Findings, ungültige Antwort, jeder Laufzeitfehler oder veraltete Revisionen blockieren. Auch unerwartete Ausnahmen versuchen, den App-Check auf `failure` zu setzen.
+6. Der `Claude review` Check-Run muss von der explizit konfigurierten GitHub-App-ID stammen. Gleicher Name oder ein GitHub-Actions-Status genügt nicht.
+7. Ein erfolgreicher Check wird nur bei identischem PR, HEAD, Basis-SHA und App-ID wiederverwendet. Drafts werden übersprungen.
 
-## Noch offene Aktivierung
+## Notwendige Plattformkonfiguration
 
-- GitHub App erstellen, nur `Checks: write` gewähren, ausschliesslich auf `mikefaehCH/web-kit` installieren und `CLAUDE_REVIEW_APP_CLIENT_ID` sowie `CLAUDE_REVIEW_APP_PRIVATE_KEY` sicher in Actions hinterlegen.
-- `Protect main` so konfigurieren, dass PRs, alle produktspezifischen CI-Checks und der App-gebundene Check `Claude review` erforderlich sind. «Require branches to be up to date» aktivieren; keinen Bypass für Maintainer einrichten.
-- Providerseitiges monatliches Ausgabenlimit unabhängig verifizieren. Die Actions-Variable `CLAUDE_REVIEW_BUDGET_APPROVED` ist nur ein Opt-in und beweist kein Provider-Limit.
-- Kontrollierte Live-Tests für PASS, FAIL/Findings, ungültige Antwort, API-Fehler/Timeout, geänderten HEAD und nicht aktivierte Konfiguration durchführen.
-- Ruleset- und App-Konfiguration, erwartete Check-Quelle und Ergebnisse dokumentieren. Bis dahin bleiben `CLAUDE_REVIEW_ENABLED` und Budget-Opt-in aus.
+- Ein GitHub Environment `claude-review` muss Deployment ausschliesslich von `main` erlauben. `ANTHROPIC_API_KEY` und `CLAUDE_REVIEW_APP_PRIVATE_KEY` gehören nur als Environment-Secrets hinein. Gleichnamige Repository-Secrets müssen entfernt werden. Client ID, App-ID und Gate-Opt-ins gehören als Environment-Variablen hinein.
+- Die App hat keine aktiven Webhooks, nur Repository-Berechtigung `Checks: Read and write` und ist nur auf `mikefaehCH/web-kit` installiert.
+- Der aktive Ruleset `Protect main` muss alle bestehenden CI-Pflichtchecks sowie `Claude review` mit exakt dieser App als Quelle erfordern. «Require branches to be up to date» muss an sein; es gibt keine Bypass-Akteure. Im Solo-Maintainer-Modell ist die erforderliche Approval-Anzahl null.
+- Ein verifiziertes Anthropic-Workspace-Ausgabenlimit von höchstens CHF 10 pro Monat ist unabhängig vom Workflow-Opt-in erforderlich. Jeder neue HEAD kann einen kostenpflichtigen Aufruf auslösen; derselbe erfolgreiche HEAD/Basis-Stand wird nicht erneut berechnet.
+
+Letzter ausgelesener Ruleset-Stand: `Protect main` ist aktiv, verlangt null Approvals und weiterhin `repository`, `static-check`, `edge-function` und `database`. `Claude review` ist noch nicht erforderlich; die Basis-Aktualität war nicht strikt erzwungen. Damit ist das Gate weiterhin **nicht verbindlich**.
 
 ## Nachweise und Grenzen
 
-Lokale Mock- und Validator-Tests belegen Fehlerbehandlung und Statuslogik, aber keinen echten Claude-Aufruf, keine App-Identität und keinen Branchschutz. Ein Live-PASS allein beweist ebenfalls keine Regel-Durchsetzung. «Protect main» hatte bei der letzten verifizierten Prüfung keine erforderlichen Checks; diese Konfiguration muss nach der App-Einrichtung erneut geprüft werden.
+Mock-Tests belegen Validator- und Fehlerlogik, aber keine Live-API-Kompatibilität, App-Identität, Environment-Branch-Beschränkung oder Ruleset-Durchsetzung. Diese Punkte brauchen nach Merge des vertrauenswürdigen Workflows kontrollierte Test-PRs und anschliessendes Auslesen der GitHub-Konfiguration. Bis dahin bleibt das Gate inaktiv.
 
 Keine produktiven Daten, echten WhatsApp-Nachrichten, automatischen Merges oder Deployments im Gate-Test verwenden.

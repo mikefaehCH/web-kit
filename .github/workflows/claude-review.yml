@@ -22,6 +22,8 @@ jobs:
     name: Review (trusted runner)
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    if: ${{ github.event.pull_request.draft == false }}
+    environment: claude-review
     steps:
       - name: Check out trusted base revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -44,6 +46,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_REVIEW_ENABLED: ${{ vars.CLAUDE_REVIEW_ENABLED }}
           CLAUDE_REVIEW_BUDGET_APPROVED: ${{ vars.CLAUDE_REVIEW_BUDGET_APPROVED }}
+          CLAUDE_REVIEW_APP_ID: ${{ vars.CLAUDE_REVIEW_APP_ID }}
           GH_TOKEN: ${{ github.token }}
           CHECKS_TOKEN: ${{ steps.review-app.outputs.token }}
           GH_REPO: ${{ github.repository }}

@@ -13,7 +13,6 @@ import os
 import re
 import sys
 import urllib.error
-import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -26,7 +25,7 @@ except ImportError:  # pragma: no cover - exercised by the workflow entry point
 API_ROOT = "https://api.github.com"
 ANTHROPIC_MESSAGES = "https://api.anthropic.com/v1/messages"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-MAX_DIFF_BYTES = 350_000
+MAX_DIFF_BYTES = 120_000
 MAX_POLICY_BYTES = 60_000
 MODEL = "claude-sonnet-5"
 
@@ -50,13 +49,18 @@ def request_json(url: str, *, token: str, accept: str = "application/vnd.github+
     return json.loads(body)
 
 
-def create_check_run(token: str, repo: str, sha: str, pr_number: int) -> int:
+def review_external_id(pr_number: int, head_sha: str, base_sha: str) -> str:
+    return f"pull-request-{pr_number}-{head_sha}-{base_sha}"
+
+
+def create_check_run(token: str, repo: str, sha: str, base_sha: str, pr_number: int,
+                     expected_app_id: int) -> int:
     """Create the gate check as the dedicated GitHub App, never as Actions."""
     url = f"{API_ROOT}/repos/{repo}/check-runs"
     payload = {
         "name": "Claude review",
         "head_sha": sha,
-        "external_id": f"pull-request-{pr_number}-{sha}",
+        "external_id": review_external_id(pr_number, sha, base_sha),
         "status": "in_progress",
         "output": {
             "title": "Claude review is running",
@@ -79,7 +83,35 @@ def create_check_run(token: str, repo: str, sha: str, pr_number: int) -> int:
     check_id = result.get("id")
     if not isinstance(check_id, int) or check_id <= 0:
         raise ReviewError("GitHub App did not create a valid check run")
+    if not isinstance(result.get("app"), dict) or result["app"].get("id") != expected_app_id:
+        try:
+            complete_check_run(token, repo, check_id, "failure", "Unexpected GitHub App identity.")
+        except Exception:
+            pass
+        raise ReviewError("Check run was not created by the configured GitHub App")
     return check_id
+
+
+def has_cached_pass(token: str, repo: str, sha: str, base_sha: str, pr_number: int,
+                    expected_app_id: int) -> bool:
+    """Avoid another paid review for a completed PASS on the same PR HEAD."""
+    url = f"{API_ROOT}/repos/{repo}/commits/{sha}/check-runs?filter=latest&per_page=100"
+    result = request_json(url, token=token)
+    expected_external_id = review_external_id(pr_number, sha, base_sha)
+    runs = result.get("check_runs") if isinstance(result, dict) else None
+    if not isinstance(runs, list):
+        raise ReviewError("GitHub returned an invalid check-run list")
+    return any(
+        isinstance(run, dict)
+        and run.get("name") == "Claude review"
+        and run.get("external_id") == expected_external_id
+        and run.get("head_sha") == sha
+        and run.get("status") == "completed"
+        and run.get("conclusion") == "success"
+        and isinstance(run.get("app"), dict)
+        and run["app"].get("id") == expected_app_id
+        for run in runs
+    )
 
 
 def complete_check_run(token: str, repo: str, check_id: int, conclusion: str,
@@ -125,9 +157,44 @@ def fetch_pr_and_diff(repo: str, pr_number: int, token: str, expected_head: str,
     ):
         raise ReviewError("PR scope or immutable SHA check failed")
 
-    diff = request_json(pr_url, token=token, accept="application/vnd.github.v3.diff")
-    if not diff.strip():
-        raise ReviewError("GitHub returned an empty PR diff")
+    changed_files = pr.get("changed_files")
+    if not isinstance(changed_files, int) or changed_files < 1:
+        raise ReviewError("PR changed-file metadata is invalid")
+    file_records: list[dict[str, Any]] = []
+    page = 1
+    while True:
+        page_url = f"{pr_url}/files?per_page=100&page={page}"
+        page_records = request_json(page_url, token=token)
+        if not isinstance(page_records, list):
+            raise ReviewError("GitHub returned invalid changed-file metadata")
+        file_records.extend(page_records)
+        if len(file_records) > changed_files:
+            raise ReviewError("GitHub returned more files than the PR metadata reports")
+        if len(page_records) < 100:
+            break
+        page += 1
+    if len(file_records) != changed_files:
+        raise ReviewError("Changed-file pagination was incomplete")
+    complete_files = []
+    for record in file_records:
+        if not isinstance(record, dict) or not isinstance(record.get("patch"), str):
+            raise ReviewError("A changed file has no textual patch; review coverage is incomplete")
+        filename = record.get("filename")
+        status = record.get("status")
+        if not isinstance(filename, str) or not filename or not isinstance(status, str):
+            raise ReviewError("Changed-file metadata is incomplete")
+        complete_files.append({
+            "filename": filename,
+            "previous_filename": record.get("previous_filename"),
+            "status": status,
+            "additions": record.get("additions"),
+            "deletions": record.get("deletions"),
+            "changes": record.get("changes"),
+            "patch": record["patch"],
+        })
+    diff = json.dumps(complete_files, ensure_ascii=True, separators=(",", ":"))
+    if not diff or len(diff.encode("utf-8")) > MAX_DIFF_BYTES:
+        raise ReviewError("Complete PR diff is empty or exceeds the configured review limit")
 
     latest = request_json(pr_url, token=token)
     if latest.get("head", {}).get("sha") != expected_head:
@@ -248,13 +315,17 @@ def main() -> int:
     repo = env.get("GH_REPO", "")
     token = env.get("GH_TOKEN", "")
     checks_token = env.get("CHECKS_TOKEN", "")
+    try:
+        expected_app_id = int(env.get("CLAUDE_REVIEW_APP_ID", ""))
+    except ValueError:
+        expected_app_id = 0
     head = env.get("EXPECTED_HEAD", "")
     base = env.get("EXPECTED_BASE", "")
     try:
         pr_number = int(env.get("PR_NUMBER", ""))
     except ValueError:
         pr_number = 0
-    if not token or not checks_token or not repo or not (1 <= pr_number <= 999_999_999):
+    if not token or not checks_token or not repo or not (1 <= pr_number <= 999_999_999) or expected_app_id <= 0:
         print("FAIL: invalid workflow metadata")
         return 1
 
@@ -262,12 +333,23 @@ def main() -> int:
         if not SHA_RE.fullmatch(head) or not SHA_RE.fullmatch(base):
             raise ReviewError("Invalid expected commit SHA")
         _, diff = fetch_pr_and_diff(repo, pr_number, token, head, base)
-        check_id = create_check_run(checks_token, repo, head, pr_number)
-        if env.get("CLAUDE_REVIEW_ENABLED") != "true" or env.get("CLAUDE_REVIEW_BUDGET_APPROVED") != "true":
+        review_enabled = (
+            env.get("CLAUDE_REVIEW_ENABLED") == "true"
+            and env.get("CLAUDE_REVIEW_BUDGET_APPROVED") == "true"
+            and bool(env.get("ANTHROPIC_API_KEY", ""))
+        )
+        if review_enabled and has_cached_pass(checks_token, repo, head, base, pr_number, expected_app_id):
+            try:
+                ensure_revisions_current(repo, pr_number, token, head, base)
+            except Exception:
+                check_id = create_check_run(checks_token, repo, head, base, pr_number, expected_app_id)
+                raise
+            print("PASS (cached for exact PR HEAD and base; main rechecked)")
+            return 0
+        check_id = create_check_run(checks_token, repo, head, base, pr_number, expected_app_id)
+        if not review_enabled:
             raise ReviewError("Claude review is disabled or budget approval is not configured")
-        api_key = env.get("ANTHROPIC_API_KEY", "")
-        if not api_key:
-            raise ReviewError("Claude API key is unavailable")
+        api_key = env["ANTHROPIC_API_KEY"]
         policies = read_trusted_policies()
         schema = json.loads(Path("scripts/claude_review.schema.json").read_text(encoding="utf-8"))
         call_claude(api_key, env.get("CLAUDE_MODEL", MODEL), head, diff, policies, schema)
@@ -278,8 +360,7 @@ def main() -> int:
         )
         print("PASS")
         return 0
-    except (ReviewError, OSError, UnicodeError, json.JSONDecodeError,
-            urllib.error.URLError, TimeoutError, ValueError) as exc:
+    except Exception as exc:
         # Never put provider output, request bodies, diffs, or credentials in logs.
         print(f"FAIL: {type(exc).__name__}")
         if "check_id" in locals():
