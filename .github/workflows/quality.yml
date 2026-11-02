@@ -19,5 +19,7 @@ jobs:
           test -s AGENTS.md
           test -s RELEASE_POLICY.md
           test -f .github/workflows/autonomous-merge.yml
+      - name: Test Claude review verdict validator
+        run: python3 -m unittest discover -s tests -p 'test_claude_*'
       - name: Explicit limitation
         run: echo 'Scaffold quality only; no generator, E2E or deployment validation yet.'
