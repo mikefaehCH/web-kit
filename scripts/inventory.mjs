@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const config = JSON.parse(await readFile(new URL('../platform/projects.json', import.meta.url), 'utf8'));
 const args = process.argv.slice(2);
 if (args.length !== 2 || args.some((value) => value.startsWith('-'))) {
-  console.error('Aufruf: npm run inventory -- <report.json> <report.md>');
+  console.error('Aufruf: node scripts/inventory.mjs <report.json> <report.md>');
   process.exitCode = 2;
 } else {
   const token = process.env.GITHUB_TOKEN;
