@@ -56,7 +56,8 @@ assert.match(runner,/Autonomy-Release: true/);
 assert.match(runner,/pulls\/\$pr\/merge/);
 assert.match(runner,/merge_method=squash/);
 assert.match(runner,/sha="\$RUN_SHA"/);
-assert.doesNotMatch(runner,/--admin|--force/);\nassert.match(runner,/Never use an admin bypass/);
+assert.doesNotMatch(runner,/--admin|--force/);
+assert.match(runner,/Never use an admin bypass/);
 console.log('Release and migration checks passed');
 
 // Current Render, local SDK and PKCE assertions from main.
