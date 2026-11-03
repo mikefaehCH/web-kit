@@ -1,5 +1,5 @@
 import { createClient } from './vendor/supabase.js';
-import { authGateState, clearStaleTotpEnrollments, isAdminUser, safeTotpQrSvg } from './auth-policy.js';
+import { authGateState, clearStaleTotpEnrollments, isAdminUser, safeTotpQrSvg, totpFactorFriendlyName } from './auth-policy.js';
 
 const url = 'https://qoensghjemruqafrbmjd.supabase.co';
 const publishable = 'sb_publishable_Qeom38G18vSgrrE5MxoXEw_LhJM1f6S';
@@ -178,10 +178,11 @@ mfaEnrollButton.addEventListener('click', async () => {
   mfaEnrollButton.disabled = true;
   pendingFactorId = null;
   try {
-    // A prior interrupted setup has no usable secret in this browser. Remove only
-    // unverified factors created by this cockpit before reusing its fixed name.
-    await clearStaleTotpEnrollments(sb.auth.mfa, 'Web-Kit Cockpit');
-    const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Web-Kit Cockpit' });
+    // Cleanup is best effort: a fresh unique name prevents an old unverified
+    // factor from blocking this attempt even if Supabase cannot remove it.
+    await clearStaleTotpEnrollments(sb.auth.mfa, 'Web-Kit Cockpit').catch(() => 0);
+    const friendlyName = totpFactorFriendlyName(crypto.randomUUID().slice(0, 12));
+    const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName });
     if (error || !data?.id) throw error || new Error('Invalid MFA enrollment response');
     pendingFactorId = data.id;
     if (typeof data.totp?.secret !== 'string' || !data.totp.secret) throw new Error('Missing TOTP secret');
