@@ -17,7 +17,8 @@ Bis das Deployment auf dem Merge-Commit erfolgreich war und die URL per HTTPS-Sm
 ## Workflow-Grenzen
 
 - Pull Requests führen Tests und Artifact-Build aus, aber kein Deployment.
-- Nur ein Push auf `main` deployt.
+- Ein Push oder ein manuell ausgelöster Workflow auf `main` deployt nach erfolgreichem Build. Ein Dispatch auf einem anderen Branch und Pull Requests deployen nicht.
+- Nach einem Merge durch `GITHUB_TOKEN` wird ein Push-Workflow unter Umständen nicht ausgelöst. Ein berechtigter Operator kann den Workflow gezielt auf `main` starten; danach den Deploy-Job und die ausgelieferten Dateien prüfen. Dieser Schritt ist noch nicht automatisch an den Merge gekoppelt.
 - Deployment-Berechtigungen `pages: write` und `id-token: write` sind auf den Deploy-Job begrenzt.
 - Checkout, Node-Setup sowie Pages-Actions sind auf überprüfte Commit-SHAs gepinnt.
 - Der Workflow veröffentlicht keine Dateien ausserhalb von `generator/`.
