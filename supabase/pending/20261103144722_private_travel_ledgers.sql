@@ -5,6 +5,7 @@ create table public.web_kit_private_trips (
   title text not null check (length(trim(title)) between 1 and 120),
   people text[] not null check (cardinality(people) between 1 and 50),
   created_at timestamptz not null default now(),
+  version integer not null default 1 check (version > 0),
   unique (id, owner_id)
 );
 create table public.web_kit_private_entries (
@@ -40,3 +41,18 @@ $$;
 revoke all on function public.web_kit_private_entry_revision() from public, anon, authenticated;
 create trigger web_kit_private_entry_revision before update on public.web_kit_private_entries
 for each row execute function public.web_kit_private_entry_revision();
+
+-- Participant removal would invalidate existing entries; retain prior names.
+create function public.web_kit_private_trip_revision() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if not old.people <@ new.people then
+    raise exception 'Removing participants is not supported';
+  end if;
+  new.version := old.version + 1;
+  return new;
+end;
+$$;
+revoke all on function public.web_kit_private_trip_revision() from public, anon, authenticated;
+create trigger web_kit_private_trip_revision before update on public.web_kit_private_trips
+for each row execute function public.web_kit_private_trip_revision();

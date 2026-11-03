@@ -13,18 +13,30 @@ export function createPrivateLedgerStore(client, ledger) {
   }
   function peopleValid(people) {
     return Array.isArray(people) && people.length > 0 && people.length <= 50 &&
-      people.every(p => typeof p === 'string' && p.trim() === p && p.length > 0 && p.length <= 120) &&
+      people.every(p => typeof p === 'string' && p.trim() === p && p.length > 0 && p.length <= 120 && !['__proto__', 'constructor', 'prototype'].includes(p)) &&
       new Set(people).size === people.length;
   }
   return Object.freeze({
     async listTrips() {
       const id = await owner();
-      return await result(client.from('web_kit_private_trips').select('id,title,people,created_at').eq('owner_id', id).order('created_at'));
+      return await result(client.from('web_kit_private_trips').select('id,title,people,created_at,version').eq('owner_id', id).order('created_at'));
     },
     async createTrip(title, people) {
       if (typeof title !== 'string' || !title.trim() || title.trim().length > 120 || !peopleValid(people)) throw new TypeError('Invalid trip');
       const id = await owner();
-      return await result(client.from('web_kit_private_trips').insert({ title: title.trim(), people, owner_id: id }).select('id,title,people,created_at').single());
+      return await result(client.from('web_kit_private_trips').insert({ title: title.trim(), people, owner_id: id }).select('id,title,people,created_at,version').single());
+    },
+    async updateTrip(trip, title, people) {
+      if (!trip || typeof trip.id !== 'string' || !trip.id || !peopleValid(trip.people) ||
+          !Number.isSafeInteger(trip.version) || trip.version < 1 || typeof title !== 'string' ||
+          !title.trim() || title.trim().length > 120 || !peopleValid(people) ||
+          !trip.people.every(person => people.includes(person))) throw new TypeError('Invalid trip update');
+      const id = await owner();
+      const rows = await result(client.from('web_kit_private_trips')
+        .update({ title: title.trim(), people }).eq('owner_id', id).eq('id', trip.id)
+        .eq('version', trip.version).select('id,title,people,created_at,version'));
+      if (!Array.isArray(rows) || rows.length !== 1) throw new Error('Reise wurde zwischenzeitlich geändert oder ist nicht verfügbar');
+      return rows[0];
     },
     async listEntries(tripId) {
       if (typeof tripId !== 'string' || !tripId) throw new TypeError('Invalid trip ID');

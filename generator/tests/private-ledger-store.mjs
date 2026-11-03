@@ -41,3 +41,13 @@ test('stale edit reports a conflict and is scoped to owner, trip, entry and vers
   assert.deepEqual(requests[0].filters, [['owner_id','owner'],['trip_id','trip-a'],['entry_id','x'],['version',1]]);
   await assert.rejects(store.updateEntry('trip-a', entry, ['A'], 0), TypeError);
 });
+
+test('trip updates retain existing participants and use version checks', async () => {
+  const {store, requests} = fixture();
+  const trip = {id:'trip-a',people:['A','B'],version:1};
+  await assert.rejects(store.updateTrip(trip, 'Test', ['A']), TypeError);
+  await assert.rejects(store.createTrip('Test', ['__proto__']), TypeError);
+  assert.equal(requests.length, 0);
+  await assert.rejects(store.updateTrip(trip, 'Updated', ['A','B','C']), /zwischenzeitlich/);
+  assert.deepEqual(requests[0].filters, [['owner_id','owner'],['id','trip-a'],['version',1]]);
+});
