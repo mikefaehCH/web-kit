@@ -20,7 +20,7 @@ function setup(over: Partial<{
   env: Record<string, string | undefined>;
 }> = {}) {
   const rpc: Call[] = [];
-  const fetches: { url: string; body: unknown }[] = [];
+  const fetches: { url: string; body: unknown; redirect?: RequestRedirect }[] = [];
   const logs: string[] = [];
   const env: Record<string, string | undefined> = { GREEN_API_TOKEN: TOKEN, WEB_KIT_ADMIN_ORIGIN: ORIGIN, ...over.env };
   const deps: Deps = {
@@ -32,7 +32,7 @@ function setup(over: Partial<{
       return over.finishResult ?? { data: true, error: null };
     },
     fetch: (async (url: string, init: RequestInit) => {
-      fetches.push({ url, body: init.body ? JSON.parse(String(init.body)) : null });
+      fetches.push({ url, body: init.body ? JSON.parse(String(init.body)) : null, redirect: init.redirect });
       return over.provider ? over.provider() : new Response(JSON.stringify({ idMessage: "BAE5F4886AD4B04E" }), { status: 200 });
     }) as unknown as typeof fetch,
     log: (event, fields) => logs.push(JSON.stringify({ event, ...fields })),
@@ -58,6 +58,7 @@ test("legitimer Admin-Versand: claim, fixe Gruppe, finish accepted via service_r
   assert.equal(body.ok, true);
   assert.equal(body.status, "accepted");
   assert.equal(t.fetches.length, 1);
+  assert.equal(t.fetches[0].redirect, "error");
   assert.deepEqual(t.fetches[0].body, { chatId: GROUP_ID, message: "Hallo Camino" });
   assert.deepEqual(t.rpc.map((c) => c.fn), ["web_kit_whatsapp_claim", "web_kit_whatsapp_finish"]);
   assert.equal(t.rpc[0].args.p_actor, ADMIN.id);
@@ -257,6 +258,8 @@ test("Kontaktabruf benötigt Admin und AAL2 und versendet keine Nachricht", asyn
   ], incomplete: true });
   assert.match(t.fetches[0].url, /\/getContacts\//);
   assert.equal(t.fetches[0].body, null);
+  assert.equal(t.fetches[0].redirect, "error");
+  assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(t.rpc.length, 0);
   assert.equal(t.logs.length, 0);
 });
@@ -268,4 +271,34 @@ test("Kontaktabruf meldet Providerfehler ohne sensible Details", async () => {
     assert.equal(res.status, 502);
     assert.ok(!(await res.text()).includes(TOKEN));
   }
+});
+
+
+test("ausgewählter Kontakt oder Gruppe wird nur mit expliziter Aktion gesendet", async () => {
+  for (const destination of ["41790000000@c.us", "120363123456789000@g.us", "79001234567-1479621234@g.us"]) {
+    const t=setup();
+    const res=await handle(req({ ...ok, action: "send_selected", chatId: destination }),t.deps);
+    assert.equal(res.status,200);
+    assert.deepEqual(t.fetches[0].body,{chatId:destination,message:"Hallo Camino"});
+    assert.equal(t.rpc[0].fn,"web_kit_whatsapp_claim");
+    assert.equal(t.rpc[1].args.p_status,"accepted");
+  }
+});
+
+test("ungültige Empfänger und unbekannte Aktion werden vor Claim und Versand blockiert", async () => {
+  for (const chatId of ["bad@c.us", "x@example.com", "123456@c.us/evil", null, 42]) {
+    const t=setup();
+    assert.equal((await handle(req({ ...ok, action:"send_selected", chatId }),t.deps)).status,400);
+    assert.equal(t.rpc.length+t.fetches.length,0);
+  }
+  const t=setup();
+  assert.equal((await handle(req({ ...ok, action:"unknown", chatId:"41790000000@c.us" }),t.deps)).status,400);
+  assert.equal(t.rpc.length+t.fetches.length,0);
+});
+
+test("Empfänger ist Bestandteil des Audit-Hashes", async () => {
+  const a=setup(), b=setup();
+  await handle(req({...ok,action:"send_selected",chatId:"41790000000@c.us"}),a.deps);
+  await handle(req({...ok,action:"send_selected",chatId:"41790000001@c.us"}),b.deps);
+  assert.notEqual(a.rpc[0].args.p_hash,b.rpc[0].args.p_hash);
 });
