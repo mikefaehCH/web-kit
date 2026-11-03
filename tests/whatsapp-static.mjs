@@ -46,29 +46,18 @@ assert.deepEqual(migrations,[
   '20261102053911_web_kit_whatsapp_dispatch_finish.sql',
   '20261102061405_web_kit_whatsapp_service_role_only.sql',
 ]);
-// Autonomer Runner: ausschliesslich README.md (AGENTS.md, RELEASE_POLICY.md §7).
+// Autonomer Runner: exakter HEAD, aktueller main-Basisstand, Opt-in und normale Merge-API.
+// GitHub selbst erzwingt konfigurierte Reviews und Pflichtchecks; der Runner nutzt keinen Bypass.
 const runner=readFileSync(new URL('../.github/workflows/autonomous-merge.yml',import.meta.url),'utf8');
-assert.match(runner,/grep -Ev '\^README\\\.md\$'/);
-assert.doesNotMatch(runner,/AGENTS\|RELEASE_POLICY/);
+assert.match(runner,/\.head\.sha==\$sha/);
+assert.match(runner,/\.base\.ref=="main"/);
+assert.match(runner,/\.head\.repo\.full_name==\.base\.repo\.full_name/);
+assert.match(runner,/Autonomy-Release: true/);
+assert.match(runner,/pulls\/\$pr\/merge/);
+assert.match(runner,/merge_method=squash/);
+assert.match(runner,/sha="\$RUN_SHA"/);
+assert.doesNotMatch(runner,/--admin|--force|bypass/i);
 console.log('Release and migration checks passed');
-
-// Filterlogik des Runners mit echten Fixtures ausführen (jq ist auf ubuntu-latest vorhanden).
-import { execFileSync } from 'node:child_process';
-const jqFilter=runner.match(/--jq '(\.\[\] \| \(if[^']+)'/)?.[1];
-assert.ok(jqFilter,'jq-Filter im Runner gefunden');
-const readmeOnly=(files)=>{
-  const out=execFileSync('jq',['-r',jqFilter],{input:JSON.stringify(files)}).toString().trim();
-  return out!=='' && out.split('\n').every((l)=>l==='README.md');
-};
-assert.equal(readmeOnly([{filename:'README.md',status:'modified'}]),true);
-assert.equal(readmeOnly([{filename:'README.md',status:'added'}]),true);
-assert.equal(readmeOnly([]),false,'leere Dateiliste');
-assert.equal(readmeOnly([{filename:'AGENTS.md',status:'modified'}]),false);
-assert.equal(readmeOnly([{filename:'README.md',status:'modified'},{filename:'RELEASE_POLICY.md',status:'modified'}]),false);
-assert.equal(readmeOnly([{filename:'docs/README.md',status:'modified'}]),false);
-assert.equal(readmeOnly([{filename:'README.md',status:'renamed',previous_filename:'AGENTS.md'}]),false,'Umbenennung AGENTS.md -> README.md');
-assert.equal(readmeOnly([{filename:'README.md',status:'removed'}]),false,'Löschung');
-console.log('Runner filter fixtures passed');
 
 // Current Render, local SDK and PKCE assertions from main.
 // Isoliertes Admin-Hosting: Security-Header und PKCE muessen in PR-CI geprueft werden.
