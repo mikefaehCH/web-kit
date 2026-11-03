@@ -11,6 +11,21 @@ export function createPrivateLedgerStore(client, ledger) {
     if (error) throw new Error('Reisekasse konnte nicht gespeichert oder geladen werden', { cause: error });
     return data;
   }
+  async function readAll(makeQuery) {
+    const out = [];
+    let expected = null;
+    while (true) {
+      const {data, count, error} = await makeQuery(out.length, out.length + 199);
+      if (error) throw new Error('Reisekasse konnte nicht geladen werden', {cause:error});
+      if (!Array.isArray(data) || !Number.isSafeInteger(count) || count < 0 || (expected !== null && count !== expected))
+        throw new Error('Reisekasse hat sich beim Laden geändert. Bitte erneut laden.');
+      expected = count;
+      if (data.length === 0 && out.length < count) throw new Error('Reisekasse konnte nicht vollständig geladen werden.');
+      out.push(...data);
+      if (out.length === count) return out;
+      if (out.length > count || out.length > 100000) throw new Error('Reisekasse konnte nicht vollständig geladen werden.');
+    }
+  }
   function peopleValid(people) {
     return Array.isArray(people) && people.length > 0 && people.length <= 50 &&
       people.every(p => typeof p === 'string' && p.trim() === p && p.length > 0 && p.length <= 120 && !['__proto__', 'constructor', 'prototype'].includes(p)) &&
@@ -19,7 +34,7 @@ export function createPrivateLedgerStore(client, ledger) {
   return Object.freeze({
     async listTrips() {
       const id = await owner();
-      return await result(client.from('web_kit_private_trips').select('id,title,people,created_at,version').eq('owner_id', id).order('created_at'));
+      return readAll((start, end) => client.from('web_kit_private_trips').select('id,title,people,created_at,version', {count:'exact'}).eq('owner_id', id).order('id').range(start, end));
     },
     async createTrip(title, people) {
       if (typeof title !== 'string' || !title.trim() || title.trim().length > 120 || !peopleValid(people)) throw new TypeError('Invalid trip');
@@ -41,8 +56,7 @@ export function createPrivateLedgerStore(client, ledger) {
     async listEntries(tripId) {
       if (typeof tripId !== 'string' || !tripId) throw new TypeError('Invalid trip ID');
       const id = await owner();
-      const rows = await result(client.from('web_kit_private_entries').select('entry_id,payload,updated_at,version').eq('owner_id', id).eq('trip_id', tripId));
-      return rows;
+      return readAll((start, end) => client.from('web_kit_private_entries').select('entry_id,payload,updated_at,version', {count:'exact'}).eq('owner_id', id).eq('trip_id', tripId).order('entry_id').range(start, end));
     },
     async updateEntry(tripId, entry, people, expectedVersion) {
       if (typeof tripId !== 'string' || !tripId || !peopleValid(people) || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1) throw new TypeError('Invalid update');

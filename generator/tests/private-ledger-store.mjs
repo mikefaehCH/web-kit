@@ -7,7 +7,7 @@ function fixture(user = { id: 'owner' }) {
   const requests = [];
   const client = { auth: { getUser: async () => ({ data: { user }, error: null }) }, from(table) {
     const request = { table, filters: [] }; requests.push(request);
-    const q = { select(s) { request.select = s; return q; }, eq(k,v) { request.filters.push([k,v]); return q; }, order() { return q; }, insert(v) { request.insert = v; return q; }, update(v) { request.update = v; return q; }, single() { return q; }, then(resolve) { resolve({ data: request.insert || [], error: null }); } };
+    const q = { select(s) { request.select = s; return q; }, eq(k,v) { request.filters.push([k,v]); return q; }, order() { return q; }, range() { return q; }, insert(v) { request.insert = v; return q; }, update(v) { request.update = v; return q; }, single() { return q; }, then(resolve) { resolve({ data: request.insert || [], count: 0, error: null }); } };
     return q;
   } };
   return { store: createPrivateLedgerStore(client, globalThis.WebKitLedger), requests };
@@ -50,4 +50,18 @@ test('trip updates retain existing participants and use version checks', async (
   assert.equal(requests.length, 0);
   await assert.rejects(store.updateTrip(trip, 'Updated', ['A','B','C']), /zwischenzeitlich/);
   assert.deepEqual(requests[0].filters, [['owner_id','owner'],['id','trip-a'],['version',1]]);
+});
+
+test('loads every page even with a smaller server cap and rejects changing totals', async () => {
+  const items=Array.from({length:475},(_,i)=>({entry_id:String(i).padStart(4,'0')}));
+  let inconsistent=false, calls=0;
+  const client={auth:{getUser:async()=>({data:{user:{id:'owner'}}})},from(){
+    let start=0;
+    const q={select(){return q},eq(){return q},order(){return q},range(a){start=a;return q},then(resolve){calls++; resolve({data:items.slice(start,start+73),count:inconsistent&&calls>1?474:475,error:null})}};
+    return q;
+  }};
+  const store=createPrivateLedgerStore(client,globalThis.WebKitLedger);
+  assert.equal((await store.listEntries('t')).length,475);
+  inconsistent=true;calls=0;
+  await assert.rejects(store.listEntries('t'),/erneut laden/);
 });
