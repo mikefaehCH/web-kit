@@ -1,5 +1,5 @@
 import { createClient } from './vendor/supabase.js';
-import { authGateState, isAdminUser } from './auth-policy.js';
+import { authGateState, clearStaleTotpEnrollments, isAdminUser, safeTotpQrSvg } from './auth-policy.js';
 
 const url = 'https://qoensghjemruqafrbmjd.supabase.co';
 const publishable = 'sb_publishable_Qeom38G18vSgrrE5MxoXEw_LhJM1f6S';
@@ -176,22 +176,42 @@ resetButton.addEventListener('click', async () => {
 
 mfaEnrollButton.addEventListener('click', async () => {
   mfaEnrollButton.disabled = true;
+  pendingFactorId = null;
   try {
+    // A prior interrupted setup has no usable secret in this browser. Remove only
+    // unverified factors created by this cockpit before reusing its fixed name.
+    await clearStaleTotpEnrollments(sb.auth.mfa, 'Web-Kit Cockpit');
     const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Web-Kit Cockpit' });
-    if (error || !data?.id || !data?.totp?.secret || typeof data.totp.qr_code !== 'string') throw error || new Error('Invalid MFA enrollment response');
-    if (!/^<svg[\s>]/i.test(data.totp.qr_code) || /<script|<foreignObject|\bon[a-z]+\s*=|(?:href|src)\s*=|url\(/i.test(data.totp.qr_code)) throw new Error('Unsafe MFA QR response');
+    if (error || !data?.id) throw error || new Error('Invalid MFA enrollment response');
     pendingFactorId = data.id;
+    if (typeof data.totp?.secret !== 'string' || !data.totp.secret) throw new Error('Missing TOTP secret');
+
+    // The secret is sufficient to complete setup if a provider SVG variant is
+    // unsupported. Never embed an unvalidated SVG returned by an API.
     mfaSecret.textContent = data.totp.secret;
-    mfaQr.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(data.totp.qr_code);
-    mfaQr.hidden = false;
-    showMfa('Authenticator mit dem QR-Code oder dem Einrichtungsschlüssel verbinden und danach einen Code eingeben.', 'enrolling');
+    const qrSvg = safeTotpQrSvg(data.totp.qr_code);
+    if (qrSvg) {
+      mfaQr.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(qrSvg);
+      mfaQr.hidden = false;
+      showMfa('Authenticator mit dem QR-Code oder dem Einrichtungsschlüssel verbinden und danach einen Code eingeben.', 'enrolling');
+    } else {
+      mfaQr.removeAttribute('src');
+      mfaQr.hidden = true;
+      showMfa('Der QR-Code konnte nicht angezeigt werden. Gib den Einrichtungsschlüssel manuell in deiner Authenticator-App ein und danach den aktuellen Code.', 'enrolling');
+    }
   } catch {
-    showMfa('Authenticator konnte nicht eingerichtet werden. Bitte später erneut versuchen.', 'enroll');
+    if (pendingFactorId) {
+      try { await sb.auth.mfa.unenroll({ factorId: pendingFactorId }); } catch { /* A later retry cleans up this unverified factor. */ }
+    }
+    pendingFactorId = null;
+    mfaSecret.textContent = '';
+    mfaQr.removeAttribute('src');
+    mfaQr.hidden = true;
+    showMfa('Authenticator konnte nicht eingerichtet werden. Ein abgebrochener Setup-Versuch wird beim nächsten Versuch bereinigt. Bitte erneut versuchen.', 'enroll');
   } finally {
     mfaEnrollButton.disabled = false;
   }
 });
-
 mfaForm.addEventListener('submit', async event => {
   event.preventDefault();
   const submit = mfaForm.querySelector('button');
