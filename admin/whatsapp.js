@@ -82,7 +82,7 @@ const contactsSearch=document.querySelector('#contacts-search');
 const contactsButton=document.querySelector('#load-contacts');
 let contacts=[];
 let contactsRequest=0;
-function clearContacts(){ contactsRequest++; selected.clear(); contacts=[];contactsList.replaceChildren();contactsSearch.value='';contactsStatus.textContent=''; }
+function clearContacts(){ contactsRequest++; selected.clear(); contacts=[]; contactsList.replaceChildren(); contactsSearch.value=''; contactsStatus.textContent=''; preview.textContent=''; previewRecipients.replaceChildren(); results.replaceChildren(); message.value=''; count.textContent='0'; status.textContent=''; invalidate(); }
 function renderContacts(){
   const query=contactsSearch.value.trim().toLocaleLowerCase('de-CH');
   const fragment=document.createDocumentFragment();
