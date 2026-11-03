@@ -38,6 +38,25 @@ jobs:
       - run: npm install --no-save --ignore-scripts playwright@1.56.1
       - run: npx playwright install --with-deps chromium webkit
       - run: mkdir -p screenshots && node tests/independent-browser-review.cjs
+      - name: Check Valencia production at 390 px
+        run: |
+          node - <<'NODE'
+          const {chromium}=require('playwright');
+          const assert=require('node:assert/strict');
+          (async()=>{
+            const b=await chromium.launch();
+            const p=await b.newPage({viewport:{width:390,height:900}});
+            const r=await p.goto('https://mikefaehch.github.io/Valencia/',{waitUntil:'domcontentloaded'});
+            assert.equal(r.status(),200);
+            assert.equal(await p.locator('main').count(),1);
+            assert.equal(await p.locator('h2.section-label').count(),3);
+            assert.equal(await p.locator('h1').innerText(),'Tipps von Pablo');
+            const g=await p.evaluate(()=>[document.documentElement.scrollWidth,document.documentElement.clientWidth]);
+            assert.ok(g[0]<=g[1],JSON.stringify(g));
+            console.log('LIVE PASS Valencia HTTP 200, main, headings, 390px, no horizontal overflow');
+            await b.close();
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
       - uses: actions/upload-artifact@v4
         if: always()
         with:
