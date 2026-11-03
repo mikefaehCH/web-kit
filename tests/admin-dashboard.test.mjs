@@ -28,6 +28,9 @@ test('TOTP QR validation accepts Supabase SVG and rejects active or external con
   assert.equal(safeTotpQrSvg('<svg><script>alert(1)</script></svg>'), null);
   assert.equal(safeTotpQrSvg('<svg><image href="https://evil.example/x"/></svg>'), null);
   assert.equal(safeTotpQrSvg('<svg onload="alert(1)"></svg>'), null);
+  assert.equal(safeTotpQrSvg('<svg><style>@import "https://evil.example/x"</style></svg>'), null);
+  assert.equal(safeTotpQrSvg('<svg><animate attributeName="href"/></svg>'), null);
+  assert.equal(safeTotpQrSvg('<svg><path onclick="alert(1)" d="M0 0"/></svg>'), null);
   assert.equal(safeTotpQrSvg('data:image/svg+xml,<svg></svg>'), null);
   assert.equal(safeTotpQrSvg('x'.repeat(100_001)), null);
 });
