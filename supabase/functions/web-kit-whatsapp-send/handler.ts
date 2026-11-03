@@ -185,6 +185,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
       host + "/waInstance" + encodeURIComponent(instance) + "/sendMessage/" + encodeURIComponent(apiToken),
       {
         method: "POST",
+        redirect: "error",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chatId: destination, message: text }),
         signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
