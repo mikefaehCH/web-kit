@@ -19,6 +19,11 @@ const endpoint=window.WEB_KIT_WHATSAPP_ENDPOINT;
 const getToken=window.WEB_KIT_GET_ACCESS_TOKEN;
 const caminoId='120363431174972238@g.us';
 const interruptedKey='web-kit-whatsapp-in-progress';
+const resolveInterrupted=document.querySelector('#resolve-interrupted');
+function hasInterrupted(){try{return sessionStorage.getItem(interruptedKey)!==null;}catch{return true;}}
+function showInterrupted(){resolveInterrupted.hidden=!hasInterrupted();}
+resolveInterrupted.addEventListener('click',()=>{try{sessionStorage.removeItem(interruptedKey);}catch{return;}showInterrupted();status.textContent='Du kannst eine neue Nachricht erstellen.';});
+showInterrupted();
 function selectedRecipients(){
   const all=new Map(selected);
   if(camino.checked)all.set(caminoId,'Camino-Gruppe');
@@ -31,6 +36,7 @@ camino.addEventListener('change',invalidate);
 form.addEventListener('submit',event=>{
   event.preventDefault();const recipients=selectedRecipients();
   if(!message.value.trim()||pending||!recipients.length)return;
+  if(hasInterrupted()){status.textContent='Bitte prüfe zuerst den unterbrochenen Versand in WhatsApp und bestätige dies.';showInterrupted();return;}
   if(recipients.length>10){status.textContent='Pro Stunde sind höchstens 10 Versandversuche möglich. Bitte wähle weniger Empfänger.';return;}
   approvedMessage=message.value.trim();approvedRecipients=recipients.map(r=>({...r,key:crypto.randomUUID()}));
   preview.textContent=approvedMessage;previewRecipients.replaceChildren();results.replaceChildren();
@@ -38,7 +44,7 @@ form.addEventListener('submit',event=>{
   review.hidden=false;confirm.focus();
 });
 cancel.addEventListener('click',()=>{invalidate();send.focus();});
-if(sessionStorage.getItem(interruptedKey))status.textContent='Ein vorheriger Versand wurde unterbrochen. Bitte prüfe in WhatsApp, welche Nachrichten angekommen sind, bevor du erneut sendest.';
+if(hasInterrupted())status.textContent='Ein vorheriger Versand wurde unterbrochen. Bitte prüfe in WhatsApp, welche Nachrichten angekommen sind, bevor du erneut sendest.';
 confirm.addEventListener('click',async()=>{
   if(pending||review.hidden||!approvedMessage||message.value.trim()!==approvedMessage||!approvedRecipients.length)return;
   if(typeof endpoint!=='string'||!endpoint.startsWith('https://')||typeof getToken!=='function'){status.textContent='Versand ist noch nicht eingerichtet.';return;}
@@ -66,7 +72,7 @@ confirm.addEventListener('click',async()=>{
   finally{
     pending=false;confirm.disabled=false;cancel.disabled=false;message.disabled=false;camino.disabled=false;
     document.querySelectorAll('.contact-choice').forEach(el=>{el.disabled=false;});
-    invalidate();
+    invalidate();showInterrupted();
   }
 });
 // Die Ansicht lädt nur auf ausdrückliche Anforderung und speichert keine Kontakte dauerhaft.
@@ -90,6 +96,7 @@ function renderContacts(){
 contactsSearch.addEventListener('input',renderContacts);
 document.querySelector('#logout').addEventListener('click',clearContacts);
 contactsButton.addEventListener('click',async()=>{
+  if(pending)return;
   const request=++contactsRequest;
   contacts=[];contactsList.replaceChildren();contactsButton.disabled=true;contactsStatus.textContent='Kontakte werden geladen …';
   try{
