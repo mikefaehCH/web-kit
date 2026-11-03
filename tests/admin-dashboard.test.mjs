@@ -33,7 +33,7 @@ test('TOTP QR validation accepts Supabase SVG and rejects active or external con
 });
 
 test('TOTP retry removes only this app’s unverified factor and fails closed on cleanup errors', async () => {
-  const { clearStaleTotpEnrollments, totpFactorFriendlyName } = await import('../admin/auth-policy.js');
+  const { clearStaleTotpEnrollments, totpFactorFriendlyName, totpNonceFromUuid } = await import('../admin/auth-policy.js');
   const removed = [];
   const api = {
     listFactors: async () => ({ data: { totp: [
@@ -48,6 +48,8 @@ test('TOTP retry removes only this app’s unverified factor and fails closed on
   assert.equal(await clearStaleTotpEnrollments(api, 'Web-Kit Cockpit'), 2);
   assert.deepEqual(removed, ['stale-1', 'stale-2']);
   assert.equal(totpFactorFriendlyName('ABC123DEF456'), 'Web-Kit Cockpit abc123def456');
+  assert.equal(totpNonceFromUuid('12345678-90ab-cdef-1234-567890abcdef'), '1234567890ab');
+  assert.throws(() => totpNonceFromUuid('bad-uuid'), /Invalid TOTP setup UUID/);
   assert.notEqual(totpFactorFriendlyName('abc123def456'), totpFactorFriendlyName('abc123def457'));
   assert.throws(() => totpFactorFriendlyName('not-a-valid-nonce'), /Invalid TOTP setup nonce/);
   await assert.rejects(() => clearStaleTotpEnrollments({

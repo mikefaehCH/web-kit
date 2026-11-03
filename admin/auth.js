@@ -1,5 +1,5 @@
 import { createClient } from './vendor/supabase.js';
-import { authGateState, clearStaleTotpEnrollments, isAdminUser, safeTotpQrSvg, totpFactorFriendlyName } from './auth-policy.js';
+import { authGateState, clearStaleTotpEnrollments, isAdminUser, safeTotpQrSvg, totpFactorFriendlyName, totpNonceFromUuid } from './auth-policy.js';
 
 const url = 'https://qoensghjemruqafrbmjd.supabase.co';
 const publishable = 'sb_publishable_Qeom38G18vSgrrE5MxoXEw_LhJM1f6S';
@@ -181,7 +181,7 @@ mfaEnrollButton.addEventListener('click', async () => {
     // Cleanup is best effort: a fresh unique name prevents an old unverified
     // factor from blocking this attempt even if Supabase cannot remove it.
     await clearStaleTotpEnrollments(sb.auth.mfa, 'Web-Kit Cockpit').catch(() => 0);
-    const friendlyName = totpFactorFriendlyName(crypto.randomUUID().slice(0, 12));
+    const friendlyName = totpFactorFriendlyName(totpNonceFromUuid(crypto.randomUUID()));
     const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName });
     if (error || !data?.id) throw error || new Error('Invalid MFA enrollment response');
     pendingFactorId = data.id;
