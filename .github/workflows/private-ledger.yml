@@ -30,3 +30,5 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f supabase/tests/00-supabase-stub.sql
           sed 's/829dfa95-6722-4b08-aa1b-843e38a06ba7/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/g' supabase/pending/20261103144722_private_travel_ledgers.sql | psql -X -v ON_ERROR_STOP=1
           psql -X -v ON_ERROR_STOP=1 -f supabase/tests/private-ledger-ci.sql
+      - name: Concurrent snapshot integration test
+        run: bash supabase/tests/private-ledger-concurrency.sh
