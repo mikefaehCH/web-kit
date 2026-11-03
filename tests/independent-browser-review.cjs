@@ -6,7 +6,7 @@ const { pathToFileURL } = require('node:url');
 async function read(page, dir) {
   await page.goto(pathToFileURL(path.resolve(dir, 'index.html')).href, {waitUntil:'load'});
   await page.evaluate(() => document.fonts.ready);
-  return page.evaluate(() => ({text:document.body.innerText.replace(/\\s+/g,' ').trim(), links:[...document.querySelectorAll('a')].map(a=>a.getAttribute('href'))}));
+  return page.evaluate(() => ({text:document.body.innerText.replace(/\s+/g,' ').trim(), links:[...document.querySelectorAll('a')].map(a=>a.getAttribute('href'))}));
 }
 (async()=>{
  for (const [name, browserType] of [['chromium',chromium],['webkit',webkit]]) {
