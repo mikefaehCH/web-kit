@@ -20,7 +20,7 @@ function setup(over: Partial<{
   env: Record<string, string | undefined>;
 }> = {}) {
   const rpc: Call[] = [];
-  const fetches: { url: string; body: unknown }[] = [];
+  const fetches: { url: string; body: unknown; redirect?: RequestRedirect }[] = [];
   const logs: string[] = [];
   const env: Record<string, string | undefined> = { GREEN_API_TOKEN: TOKEN, WEB_KIT_ADMIN_ORIGIN: ORIGIN, ...over.env };
   const deps: Deps = {
@@ -32,7 +32,7 @@ function setup(over: Partial<{
       return over.finishResult ?? { data: true, error: null };
     },
     fetch: (async (url: string, init: RequestInit) => {
-      fetches.push({ url, body: init.body ? JSON.parse(String(init.body)) : null });
+      fetches.push({ url, body: init.body ? JSON.parse(String(init.body)) : null, redirect: init.redirect });
       return over.provider ? over.provider() : new Response(JSON.stringify({ idMessage: "BAE5F4886AD4B04E" }), { status: 200 });
     }) as unknown as typeof fetch,
     log: (event, fields) => logs.push(JSON.stringify({ event, ...fields })),
@@ -257,6 +257,8 @@ test("Kontaktabruf benötigt Admin und AAL2 und versendet keine Nachricht", asyn
   ], incomplete: true });
   assert.match(t.fetches[0].url, /\/getContacts\//);
   assert.equal(t.fetches[0].body, null);
+  assert.equal(t.fetches[0].redirect, "error");
+  assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(t.rpc.length, 0);
   assert.equal(t.logs.length, 0);
 });
