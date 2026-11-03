@@ -16,3 +16,6 @@ Die Implementierung wird ausschliesslich über Pull Requests ergänzt.
 - Verbindliche Zusammenarbeit: [AGENTS.md](AGENTS.md).
 - Sicherheit, automatischer Merge und Qualitätsprüfungen: [RELEASE_POLICY.md](RELEASE_POLICY.md).
 - Generator- und Workflow-Änderungen bleiben reviewpflichtig. Eine öffentliche web-kit-Website und deren Deployment sind noch nicht konfiguriert.
+- Verbindliche Merge-Voraussetzungen sind die im GitHub-Ruleset `Protect main` geforderten Checks (`repository`, `static-check`, `edge-function`, `database`). Claude-Reviews sind zusätzliche, nicht blockierende Prüfungen und gelten nicht als GitHub-Approval.
+
+Autonomie-Pilot vom 03.11.2026: harmlose README-Änderung zur Verifikation des Opt-in-Merge-Ablaufs.

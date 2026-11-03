@@ -149,13 +149,12 @@ class WorkflowSafetyTests(unittest.TestCase):
     def test_policy_has_guarded_bootstrap_and_conditional_approval_replacement(self):
         policy = Path("RELEASE_POLICY.md").read_text(encoding="utf-8")
         agents = Path("AGENTS.md").read_text(encoding="utf-8")
-        self.assertIn("Einzige Bootstrap-Ausnahme", policy)
-        self.assertIn("Approval erst, wenn ein gültiger Live-PASS", policy)
-        self.assertIn("keine Approval und kein Gate-PASS", policy)
-        self.assertIn("Ausschliesslich PR #9", policy)
-        self.assertIn("erlischt mit dem Merge von PR #9", policy)
-        self.assertIn("Bootstrap-Ausnahme", agents)
-        self.assertIn("erlischt mit dem Merge von PR #9", agents)
+        self.assertIn("Claude ist kein Pflicht-Merge-Gate", policy)
+        self.assertIn("Claude ist ein zusätzlicher, nicht blockierender Reviewer", agents)
+        self.assertIn("Autonomy-Release: true", policy)
+        self.assertIn("keine GitHub-Approval", policy)
+        self.assertIn("nicht umgehen", policy)
+        self.assertIn("Pflichtchecks", policy)
 
     def test_docs_do_not_claim_an_active_gate_and_label_operator_statements(self):
         gate = Path("docs/CLAUDE_REVIEW_GATE.md").read_text(encoding="utf-8")
@@ -518,7 +517,7 @@ class DiffFetchTests(unittest.TestCase):
             patch("scripts.run_claude_review.request_json", side_effect=[open_pr(), [changed_file], open_pr()]) as request,
             patch("scripts.run_claude_review.fetch_file_content", return_value="source line 1\n") as full_file,
         ):
-            returned_pr, raw, paths = run_claude_review.fetch_pr_and_diff("owner/repo", 4, "token", SHA, BASE)
+            returned_pr, raw, paths, _ = run_claude_review.fetch_pr_and_diff("owner/repo", 4, "token", SHA, BASE)
         self.assertEqual(returned_pr, open_pr())
         records = json.loads(raw)
         self.assertEqual(records[0]["filename"], "src/example.py")
@@ -544,7 +543,7 @@ class DiffFetchTests(unittest.TestCase):
             patch("scripts.run_claude_review.request_json", side_effect=[open_pr(2), files, open_pr(2)]),
             patch("scripts.run_claude_review.fetch_file_content", side_effect=fake_fetch),
         ):
-            _, raw, paths = run_claude_review.fetch_pr_and_diff("owner/repo", 4, "token", SHA, BASE)
+            _, raw, paths, _ = run_claude_review.fetch_pr_and_diff("owner/repo", 4, "token", SHA, BASE)
         self.assertEqual(calls, [("old/gone.py", BASE), ("new/name.py", SHA)])
         records = json.loads(raw)
         self.assertEqual(records[0]["full_content_revision"], "base")
@@ -563,19 +562,22 @@ class DiffFetchTests(unittest.TestCase):
                     run_claude_review.fetch_pr_and_diff("owner/repo", 4, "token", SHA, BASE)
 
     def test_file_list_paginates_and_mismatched_metadata_fails_closed(self):
+        size = run_claude_review.FILES_PAGE_SIZE
         records = [
             {"filename": f"src/{i}.txt", "status": "modified", "patch": "@@ diff"}
-            for i in range(101)
+            for i in range(2 * size + 1)
         ]
+        pages = [records[:size], records[size:2 * size], records[2 * size:]]
         with (
             patch("scripts.run_claude_review.request_json",
-                  side_effect=[open_pr(101), records[:100], records[100:], open_pr(101)]) as request,
+                  side_effect=[open_pr(len(records)), *pages, open_pr(len(records))]) as request,
             patch("scripts.run_claude_review.fetch_file_content", return_value="x") as fetch_content,
         ):
-            _, context, _ = run_claude_review.fetch_pr_and_diff("owner/repo", 4, "token", SHA, BASE)
-        self.assertEqual(len(json.loads(context)), 101)
-        self.assertEqual(request.call_count, 4)
-        self.assertEqual(fetch_content.call_count, 101)
+            _, context, _, _ = run_claude_review.fetch_pr_and_diff("owner/repo", 4, "token", SHA, BASE)
+        self.assertEqual(len(json.loads(context)), len(records))
+        self.assertEqual(request.call_count, 5)
+        self.assertIn(f"per_page={size}&page=3", request.call_args_list[3].args[0])
+        self.assertEqual(fetch_content.call_count, len(records))
 
         with patch("scripts.run_claude_review.request_json", side_effect=[open_pr(2), records[:1]]):
             with self.assertRaisesRegex(run_claude_review.ReviewError, "pagination was incomplete"):
