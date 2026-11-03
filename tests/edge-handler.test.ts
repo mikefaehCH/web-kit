@@ -32,7 +32,7 @@ function setup(over: Partial<{
       return over.finishResult ?? { data: true, error: null };
     },
     fetch: (async (url: string, init: RequestInit) => {
-      fetches.push({ url, body: JSON.parse(String(init.body)) });
+      fetches.push({ url, body: init.body ? JSON.parse(String(init.body)) : null });
       return over.provider ? over.provider() : new Response(JSON.stringify({ idMessage: "BAE5F4886AD4B04E" }), { status: 200 });
     }) as unknown as typeof fetch,
     log: (event, fields) => logs.push(JSON.stringify({ event, ...fields })),
@@ -234,4 +234,38 @@ test("fehlender Origin-Header wird abgewiesen", async () => {
   });
   assert.equal((await handle(request, t.deps)).status, 403);
   assert.equal(t.fetches.length + t.rpc.length, 0);
+});
+
+
+test("Kontaktabruf benötigt Admin und AAL2 und versendet keine Nachricht", async () => {
+  for (const user of [null, { id: ADMIN.id, app_metadata: {}, aal: "aal2" }, { ...ADMIN, aal: "aal1" }]) {
+    const t = setup({ user });
+    assert.ok([401, 403].includes((await handle(req({ action: "list_contacts" }), t.deps)).status));
+    assert.equal(t.fetches.length, 0);
+  }
+  const t = setup({ provider: async () => new Response(JSON.stringify([
+    { id: "41790000000@c.us", type: "user", name: "Profil", contactName: "Kontakt", phone: "secret" },
+    { id: "120363123456789000@g.us", type: "group", name: "Gruppe" },
+    { id: "41790000000@c.us", type: "user", name: "Duplikat" },
+    { id: "attacker@c.us", type: "user", name: "Ungültig" },
+  ])) });
+  const response = await handle(req({ action: "list_contacts" }), t.deps);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { contacts: [
+    { id: "41790000000@c.us", name: "Kontakt", type: "user" },
+    { id: "120363123456789000@g.us", name: "Gruppe", type: "group" },
+  ], incomplete: true });
+  assert.match(t.fetches[0].url, /\/getContacts\//);
+  assert.equal(t.fetches[0].body, null);
+  assert.equal(t.rpc.length, 0);
+  assert.equal(t.logs.length, 0);
+});
+
+test("Kontaktabruf meldet Providerfehler ohne sensible Details", async () => {
+  for (const provider of [async () => { throw Error(TOKEN); }, async () => new Response("bad", { status: 500 }), async () => new Response("bad")]) {
+    const t = setup({ provider });
+    const res = await handle(req({ action: "list_contacts" }), t.deps);
+    assert.equal(res.status, 502);
+    assert.ok(!(await res.text()).includes(TOKEN));
+  }
 });
