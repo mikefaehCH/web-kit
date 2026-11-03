@@ -22,6 +22,7 @@ async function read(page, dir) {
     assert.deepEqual(head,base,site+' text/links changed '+name+' '+width);
     const geometry=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth,behavior:getComputedStyle(document.documentElement).scrollBehavior}));
     assert.ok(geometry.scroll<=geometry.client,site+' horizontal overflow '+name+' '+width+' '+JSON.stringify(geometry));
+    if(site==='edinburgh') await page.screenshot({path:'screenshots/'+name+'-'+width+'.png',fullPage:true,animations:'disabled'});
     if(site==='edinburgh')assert.equal(geometry.behavior,'auto','reduced motion '+name+' '+width);
     if(site==='valencia')assert.ok(baseImage.equals(await page.screenshot({fullPage:true,animations:'disabled'})),'visual difference '+name+' '+width);
     console.log('PASS',site,name,width,JSON.stringify(geometry));
