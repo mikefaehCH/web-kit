@@ -27,7 +27,7 @@ jobs:
       - run: node --check admin/auth-policy.js
       - run: node --check admin/dashboard.js
       - run: node --check admin/dashboard-data.js
-      - run: node --test tests/whatsapp-static.mjs tests/admin-dashboard.test.mjs tests/admin-navigation.test.mjs
+      - run: node --test tests/whatsapp-static.mjs tests/admin-dashboard.test.mjs tests/admin-navigation.test.mjs tests/whatsapp-logout.cjs
 
   edge-function:
     runs-on: ubuntu-latest
