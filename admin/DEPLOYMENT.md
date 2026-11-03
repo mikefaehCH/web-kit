@@ -32,3 +32,6 @@ Der geprüfte Ablauf ist: Pflichtchecks auf dem exakten Merge-Commit erfolgreich
 ## Daten und Änderungen
 
 Für diese Dokumentationskorrektur wurden keine Secrets, Render-Dienste, Supabase-Schemata oder produktiven Daten geändert. Es war keine SQL-Migration nötig.
+
+Das Cockpit vergleicht den aktuellen Main-Commit mit dem letzten gefundenen Pages-Build beziehungsweise dem Commit der ausgelieferten Render-Buildmetadaten. Abweichungen erscheinen unter «Zu prüfen»; fehlende Daten bleiben unbekannt. Für Pages wird nur der letzte in den 100 abgefragten Main-Läufen gefundene `pages build and deployment`-Lauf ausgewertet. Für Render belegt die Buildmetadatei den ausgelieferten Commit, nicht den Zustand aller Render-Deployversuche. Der CI-Indikator bleibt auf den letzten gefundenen Main-Push-Lauf beschränkt; ein Erfolg für einen anderen Commit wird nicht grün angezeigt. Eine vollständige Prüfung sämtlicher Workflows und Deployversuche ist dies nicht.
+Die Übersicht meldet zusätzlich den jüngsten gefundenen Lauf je Workflow für den aktuellen Main-Commit. Für offene PRs werden die jüngsten gefundenen PR-Läufe mit dem aktuellen PR-Commit abgeglichen; fehlen passende Läufe oder erreicht der Abruf seine Grenze, erscheint ein unbekannter Zustand. Wenn im begrenzten Abruf keine passenden Läufe enthalten sind, gilt die Einzelprüfung als unbekannt.

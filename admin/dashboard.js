@@ -1,4 +1,4 @@
-import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState } from './dashboard-data.js';
+import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, loadPullRequestAttention } from './dashboard-data.js';
 
 const grid = document.querySelector('#project-grid');
 const updated = document.querySelector('#dashboard-updated');
@@ -32,8 +32,10 @@ function cardFor(data, deployment) {
   title.textContent = project.name;
   card.append(title);
 
-  const state = workflowState(workflow);
-  const needsAttention = state !== 'success' || Boolean(error) || Boolean(issues?.issues || issues?.pullRequests);
+  const state = currentWorkflowState(workflow, data.mainSha);
+  const deployed = project.repo === 'web-kit' ? deploymentState(null, data.mainSha, deployment?.commit) : deploymentState(data.pages, data.mainSha, data.pages?.head_sha);
+  const workflowProblems = mainWorkflowAttention(data.runs, data.mainSha);
+  const needsAttention = !Array.isArray(data.prAttention) || data.prAttention.length > 0 || state !== 'success' || workflowProblems === null || workflowProblems.length > 0 || deployed !== 'current' || !issues || Boolean(error) || Boolean(issues?.issues || issues?.pullRequests);
   card.dataset.failed = String(state === 'failure');
   card.dataset.attention = String(needsAttention);
   const badge = document.createElement('p');
@@ -49,6 +51,7 @@ function cardFor(data, deployment) {
     ['Offene Pull Requests', issueCounts.prs],
     ['Offene Issues', issueCounts.issues],
     ['Commit im letzten Main-CI-Lauf', workflow?.head_sha && /^[0-9a-f]{40}$/i.test(workflow.head_sha) ? workflow.head_sha.slice(0, 7) : 'Unbekannt'],
+    ['Deployment-Stand', ({ current: 'Entspricht Main', stale: 'Weicht von Main ab', failure: 'Fehlgeschlagen', unknown: 'Unbekannt' })[deployed]],
     ['Workflow-Zeit', workflow?.updated_at ? new Date(workflow.updated_at).toLocaleString('de-CH') : 'Unbekannt'],
   ];
   if (project.repo === 'web-kit') {
@@ -109,6 +112,7 @@ async function refresh() {
       const saved = cache.get(project.repo);
       if (saved && now - saved.cachedAt < CACHE_MS) return saved.data;
       const data = await loadProjectData(project).catch(error => ({ project, loadedAt: new Date().toISOString(), issues: null, workflow: null, error: error.message || 'Abruf fehlgeschlagen' }));
+      data.prAttention = await loadPullRequestAttention(project);
       cache.set(project.repo, { data, cachedAt: now });
       return data;
     })), loadDeploymentInfo()]);
@@ -116,11 +120,22 @@ async function refresh() {
     applyFilter();
     const problems = [];
     for (const item of results) {
-      const state = workflowState(item.workflow);
+      const state = currentWorkflowState(item.workflow, item.mainSha);
       if (state === 'failure') problems.push(`${item.project.name}: letzter Main-Workflow fehlgeschlagen`);
       if (state === 'running') problems.push(`${item.project.name}: Main-Workflow läuft`);
       if (state === 'unknown') problems.push(`${item.project.name}: Status des letzten Main-Workflows unbekannt`);
       if (item.issues && (item.issues.issues || item.issues.pullRequests)) problems.push(`${item.project.name}: ${item.issues.pullRequests} offene PR(s), ${item.issues.issues} offene Issues`);
+      if (!Array.isArray(item.prAttention)) problems.push(`${item.project.name}: PR-Prüfungen unbekannt`);
+      else for (const pr of item.prAttention) problems.push(`${item.project.name}: ${pr.number ? 'PR #' + pr.number : 'PR-Liste'}${pr.name ? ' · ' + pr.name : ''} – ${statusLabel(pr.state)}`);
+      const workflowProblems = mainWorkflowAttention(item.runs, item.mainSha);
+      if (workflowProblems === null) problems.push(`${item.project.name}: einzelne CI-Läufe unbekannt`);
+      else for (const run of workflowProblems) problems.push(`${item.project.name}: ${run.name} – ${statusLabel(run.state)}`);
+      const deployed = item.project.repo === 'web-kit'
+        ? deploymentState(null, item.mainSha, deployment?.commit)
+        : deploymentState(item.pages, item.mainSha, item.pages?.head_sha);
+      if (deployed === 'failure') problems.push(`${item.project.name}: letztes Pages-Deployment fehlgeschlagen`);
+      if (deployed === 'stale') problems.push(`${item.project.name}: Deployment entspricht nicht dem aktuellen Main-Commit`);
+      if (deployed === 'unknown') problems.push(`${item.project.name}: Deployment-Stand unbekannt`);
       if (item.error) problems.push(`${item.project.name}: GitHub-Daten teilweise nicht verfügbar`);
     }
     updateAttention(problems);

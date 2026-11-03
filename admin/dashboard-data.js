@@ -56,20 +56,28 @@ export function workflowState(run) {
 export async function loadProjectData(project, fetchImpl = fetch) {
   if (!PROJECTS.some(knownProject => knownProject.repo === project?.repo)) throw new Error('Unknown project');
   const base = `/repos/${OWNER}/${encodeURIComponent(project.repo)}`;
-  const [itemsResult, runsResult] = await Promise.allSettled([
+  const [itemsResult, runsResult, mainResult] = await Promise.allSettled([
     githubJson(`${base}/issues?state=open&per_page=100`, fetchImpl),
     githubJson(`${base}/actions/runs?branch=main&per_page=100`, fetchImpl),
+    githubJson(`${base}/commits/main`, fetchImpl),
   ]);
-  const result = { project, loadedAt: new Date().toISOString(), issues: null, workflow: null, error: null };
+  const result = { project, loadedAt: new Date().toISOString(), issues: null, workflow: null, mainSha: null, pages: null, runs: null, error: null };
   const errors = [];
   if (itemsResult.status === 'fulfilled') {
     try { result.issues = splitOpenItems(itemsResult.value); }
     catch (error) { errors.push(error); }
   } else errors.push(itemsResult.reason);
   if (runsResult.status === 'fulfilled') {
-    try { result.workflow = latestMainPush(runsResult.value.workflow_runs); }
+    try {
+      const runs = runsResult.value.workflow_runs;
+      result.workflow = latestMainPush(runs);
+      result.runs = runs;
+      result.pages = runs.find(run => run.name === 'pages build and deployment' && run.head_branch === 'main') ?? null;
+    }
     catch (error) { errors.push(error); }
   } else errors.push(runsResult.reason);
+  if (mainResult.status === 'fulfilled' && /^[0-9a-f]{40}$/i.test(mainResult.value?.sha || '')) result.mainSha = mainResult.value.sha;
+  else errors.push(mainResult.status === 'rejected' ? mainResult.reason : new Error('Main-Commit unbekannt'));
   if (errors.length) result.error = errors.map(error => error?.message || 'Abruf fehlgeschlagen').join('; ');
   return result;
 }
@@ -93,4 +101,55 @@ export async function loadDeploymentInfo(fetchImpl = fetch) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// A successful build is current only when both full SHAs are known and equal.
+export function deploymentState(run, mainSha, publishedSha) {
+  if (run && workflowState(run) === 'failure') return 'failure';
+  if (run && workflowState(run) !== 'success') return 'unknown';
+  const valid = sha => typeof sha === 'string' && /^[0-9a-f]{40}$/i.test(sha);
+  if (!valid(mainSha) || !valid(publishedSha)) return 'unknown';
+  return mainSha.toLowerCase() === publishedSha.toLowerCase() ? 'current' : 'stale';
+}
+
+export function currentWorkflowState(run, mainSha) {
+  const state = workflowState(run);
+  if (state !== 'success') return state;
+  return deploymentState(null, mainSha, run?.head_sha) === 'current' ? 'success' : 'unknown';
+}
+
+// Only report the latest attempt of each workflow for the exact main commit.
+export function mainWorkflowAttention(runs, mainSha) {
+  if (!Array.isArray(runs) || !/^[0-9a-f]{40}$/i.test(mainSha || '')) return null;
+  const latest = new Map();
+  for (const run of runs) {
+    if (run.head_branch !== 'main' || run.head_sha !== mainSha || !run.name) continue;
+    if (!latest.has(run.name)) latest.set(run.name, run);
+  }
+  if (!latest.size) return null;
+  return [...latest.values()].map(run => ({ name: run.name, state: workflowState(run) })).filter(run => run.state !== 'success');
+}
+
+// Match PR workflows to the exact current head; absent or truncated data is unknown.
+export function pullRequestAttention(pulls, runs) {
+  if (!Array.isArray(pulls) || !Array.isArray(runs)) return null;
+  const problems = [];
+  if (pulls.length >= 100 || (pulls.length && runs.length >= 100)) problems.push({number:null, state:'unknown'});
+  for (const pr of pulls) {
+    if (!Number.isSafeInteger(pr?.number) || !/^[0-9a-f]{40}$/i.test(pr?.head?.sha || '')) { problems.push({number:null,state:'unknown'}); continue; }
+    const matching = runs.filter(run => run.event === 'pull_request' && run.head_sha === pr.head.sha && typeof run.name === 'string');
+    const latest = new Map();
+    for (const run of matching) if (!latest.has(run.name)) latest.set(run.name, run);
+    if (!latest.size) problems.push({number:pr.number,state:'unknown'});
+    for (const run of latest.values()) { const state=workflowState(run); if(state!=='success') problems.push({number:pr.number,name:run.name,state}); }
+  }
+  return problems;
+}
+export async function loadPullRequestAttention(project, fetchImpl=fetch) {
+  if (!PROJECTS.some(p => p.repo === project?.repo)) throw new Error('Unknown project');
+  const base=`/repos/${OWNER}/${encodeURIComponent(project.repo)}`;
+  try {
+    const [pulls, data] = await Promise.all([githubJson(`${base}/pulls?state=open&per_page=100`,fetchImpl),githubJson(`${base}/actions/runs?event=pull_request&per_page=100`,fetchImpl)]);
+    return pullRequestAttention(pulls,data?.workflow_runs);
+  } catch { return null; }
 }
