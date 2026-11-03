@@ -33,7 +33,7 @@ test('Pages workflow builds on PRs but deploys only after a main push with narro
   assert.match(workflow, /if: \$\{\{ github\.event_name == 'push' && github\.ref == 'refs\/heads\/main' \}\}/);
   assert.match(workflow, /permissions:\n      pages: write\n      id-token: write/);
   assert.doesNotMatch(workflow, /secrets\./);
-  const actions = [...workflow.matchAll(/^\s+uses: ([^ #]+)/gm)].map((match) => match[1]);
+  const actions = [...workflow.matchAll(/^\s+-\s+uses: ([^ #]+)/gm)].map((match) => match[1]);
   assert.equal(actions.length, 4);
   for (const action of actions) assert.match(action, /@[0-9a-f]{40}/);
 });
