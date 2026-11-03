@@ -42,3 +42,41 @@ confirm.addEventListener('click',async()=>{
   }catch(error){status.textContent=error instanceof Error?error.message:'Versand fehlgeschlagen.';}
   finally{pending=false;confirm.disabled=false;send.disabled=!message.value.trim();}
 });
+
+// Die Ansicht lädt nur auf ausdrückliche Anforderung und speichert keine Kontakte dauerhaft.
+const contactsList=document.querySelector('#contacts-list');
+const contactsStatus=document.querySelector('#contacts-status');
+const contactsSearch=document.querySelector('#contacts-search');
+const contactsButton=document.querySelector('#load-contacts');
+let contacts=[];
+let contactsRequest=0;
+function clearContacts(){ contactsRequest++; contacts=[];contactsList.replaceChildren();contactsSearch.value='';contactsStatus.textContent=''; }
+function renderContacts(){
+  const query=contactsSearch.value.trim().toLocaleLowerCase('de-CH');
+  const fragment=document.createDocumentFragment();
+  for(const contact of contacts){
+    const label=(contact.name||contact.id)+' · '+(contact.type==='group'?'Gruppe':'Kontakt')+' · '+contact.id;
+    if(query&&!label.toLocaleLowerCase('de-CH').includes(query))continue;
+    const item=document.createElement('li');item.textContent=label;fragment.append(item);
+  }
+  contactsList.replaceChildren(fragment);
+}
+contactsSearch.addEventListener('input',renderContacts);
+document.querySelector('#logout').addEventListener('click',clearContacts);
+contactsButton.addEventListener('click',async()=>{
+  const request=++contactsRequest;
+  contacts=[];contactsList.replaceChildren();contactsButton.disabled=true;contactsStatus.textContent='Kontakte werden geladen …';
+  try{
+    const token=await getToken();
+    if(!token)throw new Error('Bitte zuerst als Administrator anmelden.');
+    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,'apikey':'sb_publishable_Qeom38G18vSgrrE5MxoXEw_LhJM1f6S'},body:JSON.stringify({action:'list_contacts'}),cache:'no-store'});
+    if(!response.ok)throw new Error('Kontakte konnten nicht geladen werden. Bitte später erneut versuchen.');
+    const data=await response.json();
+    if(!Array.isArray(data.contacts))throw new Error('Die Kontaktliste ist nicht verfügbar.');
+    if(request!==contactsRequest)return;
+    contacts=data.contacts.filter(c=>c&&typeof c.id==='string'&&typeof c.name==='string'&&(c.type==='user'||c.type==='group'));
+    renderContacts();
+    contactsStatus.textContent=contacts.length+' Kontakte und Gruppen geladen.'+(data.incomplete?' Einige Einträge konnten nicht übernommen werden.':'');
+  }catch(error){if(request===contactsRequest)contactsStatus.textContent=error instanceof Error?error.message:'Kontakte konnten nicht geladen werden.';}
+  finally{contactsButton.disabled=false;}
+});
