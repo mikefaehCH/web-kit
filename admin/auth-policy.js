@@ -40,3 +40,10 @@ export function totpFactorFriendlyName(nonce) {
   if (typeof nonce !== 'string' || !/^[a-f0-9]{12}$/i.test(nonce)) throw new Error('Invalid TOTP setup nonce');
   return `Web-Kit Cockpit ${nonce.toLowerCase()}`;
 }
+
+export function totpNonceFromUuid(uuid) {
+  if (typeof uuid !== 'string') throw new Error('Invalid TOTP setup UUID');
+  const nonce = uuid.replaceAll('-', '').slice(0, 12);
+  if (!/^[a-f0-9]{12}$/i.test(nonce)) throw new Error('Invalid TOTP setup UUID');
+  return nonce.toLowerCase();
+}
