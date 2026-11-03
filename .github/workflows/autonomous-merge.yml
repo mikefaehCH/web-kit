@@ -1,7 +1,7 @@
 name: Autonomous merge
 on:
   workflow_run:
-    workflows: ["Web-kit quality"]
+    workflows: ["Web-kit quality", "WhatsApp admin checks"]
     types: [completed]
 permissions:
   contents: write
