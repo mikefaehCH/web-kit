@@ -26,7 +26,7 @@ export async function clearStaleTotpEnrollments(mfaApi, friendlyName) {
   if (!Array.isArray(data?.totp)) throw new Error('Invalid MFA factors response');
   const staleFactors = data.totp.filter(factor =>
     factor.status === 'unverified' &&
-    factor.friendly_name === friendlyName &&
+    (factor.friendly_name === friendlyName || factor.friendly_name?.startsWith(friendlyName + ' ')) &&
     typeof factor.id === 'string'
   );
   for (const factor of staleFactors) {
@@ -34,4 +34,9 @@ export async function clearStaleTotpEnrollments(mfaApi, friendlyName) {
     if (unenrollError) throw unenrollError;
   }
   return staleFactors.length;
+}
+
+export function totpFactorFriendlyName(nonce) {
+  if (typeof nonce !== 'string' || !/^[a-f0-9]{12}$/i.test(nonce)) throw new Error('Invalid TOTP setup nonce');
+  return `Web-Kit Cockpit ${nonce.toLowerCase()}`;
 }
