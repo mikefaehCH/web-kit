@@ -53,7 +53,7 @@
 
     <section id="workspace" hidden>
       <nav aria-label="Admin-Navigation">
-        <a href="#cockpit">Cockpit</a>
+        <a href="#cockpit" aria-current="page">Cockpit</a>
         <a href="#communication">Kommunikation</a>
         <button type="button" id="logout" class="secondary">Abmelden</button>
       </nav>
@@ -72,8 +72,8 @@
         <section id="project-grid" class="project-grid" aria-label="Projekte"></section>
       </section>
 
-      <section id="communication" class="communication" aria-labelledby="communication-title">
-        <p class="eyebrow">Manueller Versand</p><h2 id="communication-title">WhatsApp-Nachricht</h2>
+      <section id="communication" class="communication" aria-labelledby="communication-title" hidden>
+        <p class="eyebrow">Manueller Versand</p><h1 id="communication-title">WhatsApp-Nachricht</h1>
         <p>Manueller Versand an die Camino-Gruppe.</p>
         <details id="contacts-panel"><summary>WhatsApp-Kontakte und Gruppen anzeigen</summary>
           <p class="hint">Die Liste wird nur auf Anfrage geladen. Der Versand ist weiterhin auf Camino beschränkt.</p>
@@ -94,6 +94,7 @@
       </section>
     </section>
   </main>
+  <script type="module" src="./navigation.js"></script>
   <script type="module" src="./auth.js"></script>
   <script type="module" src="./dashboard.js"></script>
   <script type="module" src="./whatsapp.js"></script>
