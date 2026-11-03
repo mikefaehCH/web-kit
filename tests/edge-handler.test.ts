@@ -271,3 +271,33 @@ test("Kontaktabruf meldet Providerfehler ohne sensible Details", async () => {
     assert.ok(!(await res.text()).includes(TOKEN));
   }
 });
+
+
+test("ausgewählter Kontakt oder Gruppe wird nur mit expliziter Aktion gesendet", async () => {
+  for (const destination of ["41790000000@c.us", "120363123456789000@g.us", "79001234567-1479621234@g.us"]) {
+    const t=setup();
+    const res=await handle(req({ ...ok, action: "send_selected", chatId: destination }),t.deps);
+    assert.equal(res.status,200);
+    assert.deepEqual(t.fetches[0].body,{chatId:destination,message:"Hallo Camino"});
+    assert.equal(t.rpc[0].fn,"web_kit_whatsapp_claim");
+    assert.equal(t.rpc[1].args.p_status,"accepted");
+  }
+});
+
+test("ungültige Empfänger und unbekannte Aktion werden vor Claim und Versand blockiert", async () => {
+  for (const chatId of ["bad@c.us", "x@example.com", "123456@c.us/evil", null, 42]) {
+    const t=setup();
+    assert.equal((await handle(req({ ...ok, action:"send_selected", chatId }),t.deps)).status,400);
+    assert.equal(t.rpc.length+t.fetches.length,0);
+  }
+  const t=setup();
+  assert.equal((await handle(req({ ...ok, action:"unknown", chatId:"41790000000@c.us" }),t.deps)).status,400);
+  assert.equal(t.rpc.length+t.fetches.length,0);
+});
+
+test("Empfänger ist Bestandteil des Audit-Hashes", async () => {
+  const a=setup(), b=setup();
+  await handle(req({...ok,action:"send_selected",chatId:"41790000000@c.us"}),a.deps);
+  await handle(req({...ok,action:"send_selected",chatId:"41790000001@c.us"}),b.deps);
+  assert.notEqual(a.rpc[0].args.p_hash,b.rpc[0].args.p_hash);
+});
