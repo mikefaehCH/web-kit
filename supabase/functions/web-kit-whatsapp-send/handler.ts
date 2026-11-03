@@ -99,6 +99,36 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     return json({ error: "Invalid JSON" }, 400);
   }
   if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "Invalid JSON" }, 400);
+  // Nur explizit auf Anforderung eines MFA-geschützten Admins. Keine Kontaktdaten in Logs.
+  if ((body as { action?: unknown }).action === "list_contacts") {
+    let response: Response;
+    try {
+      response = await deps.fetch(
+        host + "/waInstance" + encodeURIComponent(instance) + "/getContacts/" + encodeURIComponent(apiToken),
+        { method: "GET", signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) },
+      );
+    } catch {
+      return json({ error: "Contacts temporarily unavailable" }, 502);
+    }
+    if (!response.ok) return json({ error: "Contacts temporarily unavailable" }, 502);
+    let contacts: unknown;
+    try { contacts = await response.json(); } catch { return json({ error: "Invalid contacts response" }, 502); }
+    if (!Array.isArray(contacts) || contacts.length > 10000) return json({ error: "Invalid contacts response" }, 502);
+    const seen = new Set<string>();
+    const result: { id: string; name: string; type: string }[] = [];
+    for (const entry of contacts) {
+      if (!entry || typeof entry !== "object") continue;
+      const { id, type, name, contactName } = entry as Record<string, unknown>;
+      if (typeof id !== "string" || typeof type !== "string") continue;
+      if (!(type === "user" && /^[0-9]{6,20}@c\.us$/.test(id)) &&
+          !(type === "group" && /^[0-9]{6,24}(?:-[0-9]{1,20})?@g\.us$/.test(id))) continue;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const label = typeof contactName === "string" && contactName.trim() ? contactName : name;
+      result.push({ id, type, name: typeof label === "string" ? label.trim().slice(0, 120) : "" });
+    }
+    return json({ contacts: result, incomplete: result.length !== contacts.length });
+  }
   const { message, requestKey } = body as { message?: unknown; requestKey?: unknown };
   // Empfänger werden bewusst nicht gelesen: Die Gruppe ist serverseitig fixiert.
   if (typeof message !== "string" || !message.trim() || message.length > MAX_LENGTH) {
