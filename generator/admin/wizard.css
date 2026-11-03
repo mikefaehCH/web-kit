@@ -80,7 +80,8 @@ input[type='checkbox'] {
   gap: 12px;
   flex-wrap: wrap;
 }
-button {
+button,
+.button {
   font: inherit;
   border: 1px solid #25332f;
   background: #25332f;
@@ -90,11 +91,17 @@ button {
   border-radius: 8px;
   cursor: pointer;
 }
+.button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
 button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 button:focus-visible,
+.button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {

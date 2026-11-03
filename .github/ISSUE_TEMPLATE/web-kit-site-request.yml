@@ -1,0 +1,41 @@
+name: Neue Website aus web-kit
+description: Eine Website-Konfiguration zur Umsetzung oder Beratung einreichen
+title: "[web-kit] Neue Website"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Dieses Repository und seine Issues sind öffentlich. Füge keine echten Namen, Kontaktdaten, Buchungs-, Finanz- oder sonstigen privaten Angaben ein.
+        Exportiere die `site.json` im Wizard, entferne private Inhalte und füge erst danach die bereinigte Konfiguration hier ein.
+  - type: input
+    id: project_id
+    attributes:
+      label: Projekt-ID
+      description: Öffentliche technische Kennung aus der bereinigten site.json
+      placeholder: meine-website
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Kategorie
+      options:
+        - travel
+        - general
+    validations:
+      required: true
+  - type: textarea
+    id: site_json
+    attributes:
+      label: Bereinigte site.json
+      description: Vollständige Konfiguration aus dem Wizard, ausschliesslich nach Entfernung privater Angaben
+      render: json
+    validations:
+      required: true
+  - type: checkboxes
+    id: public_data_confirmation
+    attributes:
+      label: Öffentliche Daten
+      options:
+        - label: Ich habe private Angaben entfernt und verstanden, dass dieses Issue öffentlich sichtbar ist.
+          required: true

@@ -73,7 +73,18 @@
           <button type="submit">Konfiguration prüfen</button
           ><button type="button" id="download" disabled>site.json herunterladen</button>
           <button type="button" id="create" disabled>Website erstellen</button>
+          <a
+            class="button"
+            href="https://github.com/mikefaehCH/web-kit/issues/new?template=web-kit-site-request.yml"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub-Issue vorbereiten</a
+          >
         </div>
+        <p class="note">
+          Das GitHub-Issue ist öffentlich. Der Wizard überträgt keine Konfiguration automatisch.
+          Entferne private Angaben, bevor du site.json manuell in das Formular kopierst.
+        </p>
         <p id="message" role="status" aria-live="polite"></p>
       </form>
       <section aria-label="Vorschau">
