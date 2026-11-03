@@ -27,7 +27,8 @@ assert.match(auth,/resetPasswordForEmail/);
 assert.doesNotMatch(auth,/signUp\(/);
 assert.match(auth,/isAdminUser\(user\)/);
 assert.match(js,/approvedMessage/);
-assert.match(js,/requestKey/);
+assert.doesNotMatch(js,/send_selected/);
+assert.match(js,/vorübergehend nicht verfügbar/);
 assert.match(edge,/web_kit_whatsapp_claim/);
 assert.match(edge,/web_kit_whatsapp_finish/);
 
