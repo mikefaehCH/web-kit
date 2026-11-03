@@ -6,6 +6,7 @@ const root = dirname(fileURLToPath(import.meta.url));
 const output = join(root, 'dist');
 const files = [
   'auth.js',
+  'navigation.js',
   'auth-policy.js',
   'dashboard.js',
   'dashboard-data.js',
