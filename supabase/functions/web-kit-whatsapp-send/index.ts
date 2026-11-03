@@ -17,8 +17,14 @@ const deps: Deps = {
   env: (name) => Deno.env.get(name),
   getUser: async (jwt) => {
     if (!authClient) return null;
-    const { data, error } = await authClient.auth.getUser(jwt);
-    return error || !data.user ? null : { id: data.user.id, app_metadata: data.user.app_metadata };
+    const [{ data, error }, { data: claimsData, error: claimsError }] = await Promise.all([
+      authClient.auth.getUser(jwt),
+      authClient.auth.getClaims(jwt),
+    ]);
+    const claims = claimsData?.claims;
+    return error || claimsError || !data.user || typeof claims?.aal !== "string"
+      ? null
+      : { id: data.user.id, app_metadata: data.user.app_metadata, aal: claims.aal };
   },
   serviceRpc: async (fn, args) => {
     if (!serviceClient) return { data: null, error: "service client not configured" };

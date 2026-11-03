@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { handle, GROUP_ID, type Deps } from "../supabase/functions/web-kit-whatsapp-send/handler.ts";
 
 const ORIGIN = "https://web-kit-admin.onrender.com";
-const ADMIN = { id: "11111111-1111-4111-8111-111111111111", app_metadata: { web_kit_admin: true } };
+const ADMIN = { id: "11111111-1111-4111-8111-111111111111", app_metadata: { web_kit_admin: true }, aal: "aal2" };
 const KEY = "aaaaaaaa-0000-4000-8000-000000000001";
 const JWT = "Bearer eyJhbGciOiJIUzI1NiJ9.test.signature";
 const TOKEN = "secret-green-token-123";
@@ -13,7 +13,7 @@ const TOKEN = "secret-green-token-123";
 type Call = { fn: string; args: Record<string, unknown> };
 
 function setup(over: Partial<{
-  user: typeof ADMIN | { id: string; app_metadata: Record<string, unknown> } | null;
+  user: typeof ADMIN | { id: string; app_metadata: Record<string, unknown>; aal?: string } | null;
   claim: { data: unknown; error: unknown };
   finishResult: { data: unknown; error: unknown };
   provider: () => Promise<Response>;
@@ -93,6 +93,14 @@ test("Nicht-Admin 403, auch mit user_metadata-Flag", async () => {
     assert.equal((await handle(req(ok), t.deps)).status, 403);
     assert.equal(t.fetches.length + t.rpc.length, 0);
   }
+});
+
+test("Admin ohne verifizierte MFA (AAL1) wird vor Datenbank und Provider abgewiesen", async () => {
+  const t = setup({ user: { id: ADMIN.id, app_metadata: { web_kit_admin: true }, aal: "aal1" } });
+  const res = await handle(req(ok), t.deps);
+  assert.equal(res.status, 403);
+  assert.equal((await res.json()).error, "Second factor required");
+  assert.equal(t.fetches.length + t.rpc.length, 0);
 });
 
 test("fremde Origin 403, OPTIONS 204, GET 405", async () => {

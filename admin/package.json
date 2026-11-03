@@ -1,6 +1,7 @@
 {
   "name": "web-kit-admin-assets",
   "private": true,
+  "type": "module",
   "version": "1.0.0",
   "description": "Reproducible local Supabase browser bundle for the isolated Web-Kit admin.",
   "scripts": {
