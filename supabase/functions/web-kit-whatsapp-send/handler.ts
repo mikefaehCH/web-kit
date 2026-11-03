@@ -62,7 +62,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   const configuredOrigin = validAdminOrigin(deps.env("WEB_KIT_ADMIN_ORIGIN"));
   const cors = corsHeaders(deps.env);
   const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
   const origin = req.headers.get("origin");
   if (!configuredOrigin) return json({ error: "Admin origin not configured" }, 503);
@@ -105,7 +105,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     try {
       response = await deps.fetch(
         host + "/waInstance" + encodeURIComponent(instance) + "/getContacts/" + encodeURIComponent(apiToken),
-        { method: "GET", signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) },
+        { method: "GET", redirect: "error", signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) },
       );
     } catch {
       return json({ error: "Contacts temporarily unavailable" }, 502);
