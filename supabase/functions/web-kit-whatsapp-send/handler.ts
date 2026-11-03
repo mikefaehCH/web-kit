@@ -129,8 +129,17 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     }
     return json({ contacts: result, incomplete: result.length !== contacts.length });
   }
-  const { message, requestKey } = body as { message?: unknown; requestKey?: unknown };
-  // Empfänger werden bewusst nicht gelesen: Die Gruppe ist serverseitig fixiert.
+  const { message, requestKey, action, chatId } = body as { message?: unknown; requestKey?: unknown; action?: unknown; chatId?: unknown };
+  // Legacy-Aufrufe bleiben auf Camino beschränkt. Neue Empfänger nur nach expliziter Aktion.
+  let destination = GROUP_ID;
+  if (action === "send_selected") {
+    if (typeof chatId !== "string" || !(/^[0-9]{6,20}@c\.us$/.test(chatId) || /^[0-9]{6,24}(?:-[0-9]{1,20})?@g\.us$/.test(chatId))) {
+      return json({ error: "Invalid recipient" }, 400);
+    }
+    destination = chatId;
+  } else if (action !== undefined) {
+    return json({ error: "Invalid action" }, 400);
+  }
   if (typeof message !== "string" || !message.trim() || message.length > MAX_LENGTH) {
     return json({ error: "Message must be 1–4000 characters" }, 400);
   }
@@ -138,7 +147,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
 
   const text = message.trim();
   const key = requestKey.toLowerCase();
-  const hash = await sha256Hex(text);
+  const hash = await sha256Hex(action === "send_selected" ? JSON.stringify([destination, text]) : text);
   const ref = key.slice(0, 8); // Log-Referenz ohne Personenbezug
 
   let claim: RpcResult;
@@ -177,7 +186,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatId: GROUP_ID, message: text }),
+        body: JSON.stringify({ chatId: destination, message: text }),
         signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
       },
     );
