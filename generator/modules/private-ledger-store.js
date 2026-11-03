@@ -53,10 +53,13 @@ export function createPrivateLedgerStore(client, ledger) {
       if (!Array.isArray(rows) || rows.length !== 1) throw new Error('Reise wurde zwischenzeitlich geändert oder ist nicht verfügbar');
       return rows[0];
     },
-    async listEntries(tripId) {
-      if (typeof tripId !== 'string' || !tripId) throw new TypeError('Invalid trip ID');
-      const id = await owner();
-      return readAll((start, end) => client.from('web_kit_private_entries').select('entry_id,payload,updated_at,version', {count:'exact'}).eq('owner_id', id).eq('trip_id', tripId).order('entry_id').range(start, end));
+    async getTripSnapshot(tripId) {
+      if (typeof tripId !== 'string' || !tripId || typeof client.rpc !== 'function') throw new TypeError('Invalid trip ID or client');
+      await owner();
+      const snapshot = await result(client.rpc('web_kit_private_ledger_snapshot', {p_trip_id:tripId}));
+      if (!snapshot || snapshot.trip?.id !== tripId || !peopleValid(snapshot.trip.people) || !Array.isArray(snapshot.entries))
+        throw new Error('Reisekasse ist nicht verfügbar oder unvollständig.');
+      return snapshot;
     },
     async updateEntry(tripId, entry, people, expectedVersion) {
       if (typeof tripId !== 'string' || !tripId || !peopleValid(people) || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1) throw new TypeError('Invalid update');

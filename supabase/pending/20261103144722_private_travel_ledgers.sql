@@ -56,3 +56,15 @@ $$;
 revoke all on function public.web_kit_private_trip_revision() from public, anon, authenticated;
 create trigger web_kit_private_trip_revision before update on public.web_kit_private_trips
 for each row execute function public.web_kit_private_trip_revision();
+
+-- One invoker-security statement reads the trip and all of its entries in one MVCC snapshot.
+create function public.web_kit_private_ledger_snapshot(p_trip_id uuid) returns jsonb
+language sql stable security invoker set search_path = '' as $$
+  select pg_catalog.jsonb_build_object(
+    'trip', pg_catalog.jsonb_build_object('id', t.id, 'title', t.title, 'people', t.people, 'created_at', t.created_at, 'version', t.version),
+    'entries', coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('entry_id', e.entry_id, 'payload', e.payload, 'updated_at', e.updated_at, 'version', e.version) order by e.entry_id)
+      from public.web_kit_private_entries e where e.trip_id = t.id and e.owner_id = t.owner_id), '[]'::jsonb))
+  from public.web_kit_private_trips t where t.id = p_trip_id and t.owner_id = (select auth.uid());
+$$;
+revoke all on function public.web_kit_private_ledger_snapshot(uuid) from public, anon, authenticated;
+grant execute on function public.web_kit_private_ledger_snapshot(uuid) to authenticated;

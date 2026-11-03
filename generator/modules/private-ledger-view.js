@@ -27,7 +27,11 @@ export function mountPrivateLedger(root, { store, ledger, backup }) {
     for (const t of trips) { const o=el('option',t.title); o.value=t.id; tripSelect.append(o); }
     trip = trips.find(t=>t.id===selectedId) || null;
     tripSelect.value=trip?.id || '';
-    entries = trip ? await store.listEntries(trip.id) : [];
+    if (trip) {
+      const snapshot = await store.getTripSnapshot(trip.id);
+      if (disposed) return;
+      trip = snapshot.trip; entries = snapshot.entries;
+    } else entries = [];
     if (!disposed) render();
   }
   form.addEventListener('submit', e => { e.preventDefault(); run(async () => {

@@ -5,7 +5,7 @@ import { createPrivateLedgerStore } from '../modules/private-ledger-store.js';
 
 function fixture(user = { id: 'owner' }) {
   const requests = [];
-  const client = { auth: { getUser: async () => ({ data: { user }, error: null }) }, from(table) {
+  const client = { auth: { getUser: async () => ({ data: { user }, error: null }) }, rpc(name,args) { requests.push({rpc:name,args}); return Promise.resolve({data:{trip:{id:args.p_trip_id,people:['A']},entries:[]},error:null}); }, from(table) {
     const request = { table, filters: [] }; requests.push(request);
     const q = { select(s) { request.select = s; return q; }, eq(k,v) { request.filters.push([k,v]); return q; }, order() { return q; }, range() { return q; }, insert(v) { request.insert = v; return q; }, update(v) { request.update = v; return q; }, single() { return q; }, then(resolve) { resolve({ data: request.insert || [], count: 0, error: null }); } };
     return q;
@@ -15,9 +15,9 @@ function fixture(user = { id: 'owner' }) {
 
 test('reads only isolated owner and trip tables', async () => {
   const {store, requests} = fixture();
-  await store.listTrips(); await store.listEntries('trip-a');
-  assert.deepEqual(requests.map(r => r.table), ['web_kit_private_trips','web_kit_private_entries']);
-  assert.deepEqual(requests[1].filters, [['owner_id','owner'],['trip_id','trip-a']]);
+  await store.listTrips(); await store.getTripSnapshot('trip-a');
+  assert.equal(requests[0].table, 'web_kit_private_trips');
+  assert.deepEqual(requests[1], {rpc:'web_kit_private_ledger_snapshot',args:{p_trip_id:'trip-a'}});
 });
 test('validates participants and normalizes entries before inserting', async () => {
   const {store, requests} = fixture();
@@ -61,7 +61,7 @@ test('loads every page even with a smaller server cap and rejects changing total
     return q;
   }};
   const store=createPrivateLedgerStore(client,globalThis.WebKitLedger);
-  assert.equal((await store.listEntries('t')).length,475);
+  assert.equal((await store.listTrips()).length,475);
   inconsistent=true;calls=0;
-  await assert.rejects(store.listEntries('t'),/erneut laden/);
+  await assert.rejects(store.listTrips(),/erneut laden/);
 });

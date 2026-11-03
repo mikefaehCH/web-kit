@@ -30,10 +30,22 @@ do $$ declare changed integer; v integer; begin
   get diagnostics changed = row_count;
   assert changed = 0, 'stale update';
 end $$;
+
+-- Aggregation is one SQL statement, independent of Data API row limits.
+insert into public.web_kit_private_entries(trip_id,entry_id,payload)
+select 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid, 'fixture-' || i, jsonb_build_object('id','fixture-' || i)
+from generate_series(1,1200) as i;
+do $$ declare snap jsonb; begin
+  snap := public.web_kit_private_ledger_snapshot('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+  assert jsonb_array_length(snap->'entries') = 1201, 'snapshot truncation';
+  assert snap->'trip'->>'title' = 'Updated', 'snapshot trip';
+  assert public.web_kit_private_ledger_snapshot('dddddddd-dddd-4ddd-8ddd-dddddddddddd') is null, 'unknown trip';
+end $$;
 select set_config('request.jwt.claim.sub','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',false);
 do $$ begin
   assert (select count(*) from public.web_kit_private_trips) = 0, 'other user trip access';
   assert (select count(*) from public.web_kit_private_entries) = 0, 'other user entry access';
+  assert public.web_kit_private_ledger_snapshot('cccccccc-cccc-4ccc-8ccc-cccccccccccc') is null, 'other user snapshot';
   begin
     insert into public.web_kit_private_trips(title,people) values ('Forbidden',array['B']);
     raise exception 'other user insert allowed';
@@ -42,6 +54,10 @@ end $$;
 reset role;
 set role anon;
 do $$ begin
+  begin
+    perform public.web_kit_private_ledger_snapshot('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+    raise exception 'anonymous snapshot allowed';
+  exception when insufficient_privilege then null; end;
   begin
     perform count(*) from public.web_kit_private_trips;
     raise exception 'anonymous select allowed';
