@@ -33,18 +33,23 @@ test('TOTP QR validation accepts Supabase SVG and rejects active or external con
 });
 
 test('TOTP retry removes only this app’s unverified factor and fails closed on cleanup errors', async () => {
-  const { clearStaleTotpEnrollments } = await import('../admin/auth-policy.js');
+  const { clearStaleTotpEnrollments, totpFactorFriendlyName } = await import('../admin/auth-policy.js');
   const removed = [];
   const api = {
     listFactors: async () => ({ data: { totp: [
       { id: 'stale-1', status: 'unverified', friendly_name: 'Web-Kit Cockpit' },
+      { id: 'stale-2', status: 'unverified', friendly_name: 'Web-Kit Cockpit abc123def456' },
       { id: 'verified', status: 'verified', friendly_name: 'Web-Kit Cockpit' },
       { id: 'other', status: 'unverified', friendly_name: 'Personal phone' },
+      { id: 'lookalike', status: 'unverified', friendly_name: 'Web-Kit Cockpitty' },
     ] }, error: null }),
     unenroll: async ({ factorId }) => { removed.push(factorId); return { error: null }; },
   };
-  assert.equal(await clearStaleTotpEnrollments(api, 'Web-Kit Cockpit'), 1);
-  assert.deepEqual(removed, ['stale-1']);
+  assert.equal(await clearStaleTotpEnrollments(api, 'Web-Kit Cockpit'), 2);
+  assert.deepEqual(removed, ['stale-1', 'stale-2']);
+  assert.equal(totpFactorFriendlyName('ABC123DEF456'), 'Web-Kit Cockpit abc123def456');
+  assert.notEqual(totpFactorFriendlyName('abc123def456'), totpFactorFriendlyName('abc123def457'));
+  assert.throws(() => totpFactorFriendlyName('not-a-valid-nonce'), /Invalid TOTP setup nonce/);
   await assert.rejects(() => clearStaleTotpEnrollments({
     listFactors: async () => ({ data: null, error: new Error('list failed') }),
   }, 'Web-Kit Cockpit'), /list failed/);
