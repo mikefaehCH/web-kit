@@ -6,6 +6,10 @@ const attention = document.querySelector('#attention');
 const attentionList = document.querySelector('#attention-list');
 const refreshButton = document.querySelector('#refresh-dashboard');
 const projectFilter = document.querySelector('#project-filter');
+const emptyFilter = document.createElement('p');
+emptyFilter.setAttribute('role', 'status');
+emptyFilter.hidden = true;
+grid.before(emptyFilter);
 const cache = new Map();
 const CACHE_MS = 15 * 60 * 1000;
 let busy = false;
@@ -99,6 +103,11 @@ function applyFilter() {
     card.hidden = projectFilter.value === 'attention' && card.dataset.attention !== 'true'
       || projectFilter.value === 'failed' && card.dataset.failed !== 'true';
   }
+  const hasResults = [...grid.children].some(card => !card.hidden);
+  emptyFilter.hidden = hasResults || !grid.children.length;
+  emptyFilter.textContent = projectFilter.value === 'failed'
+    ? 'Keine Projekte mit fehlgeschlagenem letztem Main-Workflow gefunden. Unbekannte Zustände sind unter «Alle Projekte» sichtbar.'
+    : 'Keine Projekte für diese Ansicht gefunden.';
 }
 
 async function refresh() {
