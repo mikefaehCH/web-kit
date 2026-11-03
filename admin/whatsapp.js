@@ -38,7 +38,7 @@ confirm.addEventListener('click',async()=>{
     // Nur bei eindeutiger Ablehnung (502) darf ein bewusster neuer Versuch eine neue Request-ID erhalten.
     if(response.status===502)requestKey=crypto.randomUUID();
     if(!response.ok)throw new Error(errorText(response.status));
-    status.textContent='Nachricht an Camino gesendet.';message.value='';count.textContent='0';review.hidden=true;approvedMessage=null;requestKey=null;
+    status.textContent='WhatsApp-Dienst hat die Nachricht für Camino angenommen. Die Zustellung ist damit noch nicht bestätigt.';message.value='';count.textContent='0';review.hidden=true;approvedMessage=null;requestKey=null;
   }catch(error){status.textContent=error instanceof Error?error.message:'Versand fehlgeschlagen.';}
   finally{pending=false;confirm.disabled=false;send.disabled=!message.value.trim();}
 });
