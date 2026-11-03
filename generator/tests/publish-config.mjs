@@ -24,13 +24,13 @@ test('public issue form requires privacy confirmation before collecting site.jso
   assert.match(form, /private Angaben entfernt[\s\S]*?required: true/);
 });
 
-test('Pages workflow builds on PRs but deploys only after a main push with narrow permissions', async () => {
+test('Pages workflow builds on PRs but deploys only for main push or dispatch with narrow permissions', async () => {
   const workflow = await read('../.github/workflows/publish-generator-pages.yml');
   assert.match(workflow, /pull_request:[\s\S]*?branches: \[main\]/);
   assert.match(workflow, /push:[\s\S]*?branches: \[main\]/);
   assert.match(workflow, /cp -R generator\/\. _site\//);
   assert.match(workflow, /test -s _site\/admin\/index\.html/);
-  assert.match(workflow, /if: \$\{\{ github\.event_name == 'push' && github\.ref == 'refs\/heads\/main' \}\}/);
+  assert.match(workflow, /if: \$\{\{ \(github\.event_name == 'push' \|\| github\.event_name == 'workflow_dispatch'\) && github\.ref == 'refs\/heads\/main' \}\}/);
   assert.match(workflow, /permissions:\n      pages: write\n      id-token: write/);
   assert.doesNotMatch(workflow, /secrets\./);
   const actions = [...workflow.matchAll(/^\s+(?:-\s*)?uses: ([^ #]+)/gm)].map((match) => match[1]);
