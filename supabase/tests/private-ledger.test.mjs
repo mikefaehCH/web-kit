@@ -8,6 +8,13 @@ let sql=fs.readFileSync(new URL('../pending/20261103144722_private_travel_ledger
 await db.query("select set_config('request.jwt.claim.sub',$1,false)",[a]);
 await db.query(`insert into public.web_kit_private_trips(id,title,people) values ($1,'Fixture',array['A'])`,[trip]);
 await db.query(`insert into public.web_kit_private_entries(trip_id,entry_id,payload) values ($1,'x','{"id":"x"}')`,[trip]);
+
+// Two devices start from version 1; the stale edit must affect no rows.
+let first = await db.query(`update public.web_kit_private_entries set payload='{"id":"x","description":"first"}', version=999 where trip_id=$1 and entry_id='x' and version=1 returning version`, [trip]);
+assert.equal(first.rows[0].version, 2);
+let stale = await db.query(`update public.web_kit_private_entries set payload='{"id":"x","description":"stale"}' where trip_id=$1 and entry_id='x' and version=1 returning version`, [trip]);
+assert.equal(stale.rows.length, 0);
+assert.equal((await db.query(`select payload->>'description' as description from public.web_kit_private_entries where trip_id=$1 and entry_id='x'`, [trip])).rows[0].description, 'first');
 await assert.rejects(db.query(`insert into public.web_kit_private_entries(trip_id,entry_id,payload) values ($1,'bad','{}')`,[trip]));
 await assert.rejects(db.query(`insert into public.web_kit_private_entries(trip_id,entry_id,payload) values ($1,'bad','{"id":"bad"}')`,[b]));
 await db.query("select set_config('request.jwt.claim.sub',$1,false)",[b]);

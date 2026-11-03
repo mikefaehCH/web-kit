@@ -29,15 +29,27 @@ export function createPrivateLedgerStore(client, ledger) {
     async listEntries(tripId) {
       if (typeof tripId !== 'string' || !tripId) throw new TypeError('Invalid trip ID');
       const id = await owner();
-      const rows = await result(client.from('web_kit_private_entries').select('entry_id,payload,updated_at').eq('owner_id', id).eq('trip_id', tripId));
+      const rows = await result(client.from('web_kit_private_entries').select('entry_id,payload,updated_at,version').eq('owner_id', id).eq('trip_id', tripId));
       return rows;
+    },
+    async updateEntry(tripId, entry, people, expectedVersion) {
+      if (typeof tripId !== 'string' || !tripId || !peopleValid(people) || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1) throw new TypeError('Invalid update');
+      const normalized = ledger.normalize(entry, people);
+      if (!normalized) throw new TypeError('Invalid entry');
+      const id = await owner();
+      const rows = await result(client.from('web_kit_private_entries')
+        .update({ payload: normalized }).eq('owner_id', id).eq('trip_id', tripId)
+        .eq('entry_id', normalized.id).eq('version', expectedVersion)
+        .select('entry_id,payload,updated_at,version'));
+      if (!Array.isArray(rows) || rows.length !== 1) throw new Error('Eintrag wurde zwischenzeitlich geändert oder ist nicht verfügbar');
+      return rows[0];
     },
     async addEntry(tripId, entry, people) {
       if (typeof tripId !== 'string' || !tripId || !peopleValid(people)) throw new TypeError('Invalid trip');
       const normalized = ledger.normalize(entry, people);
       if (!normalized) throw new TypeError('Invalid entry');
       const id = await owner();
-      return await result(client.from('web_kit_private_entries').insert({ trip_id: tripId, owner_id: id, entry_id: normalized.id, payload: normalized }).select('entry_id,payload,updated_at').single());
+      return await result(client.from('web_kit_private_entries').insert({ trip_id: tripId, owner_id: id, entry_id: normalized.id, payload: normalized }).select('entry_id,payload,updated_at,version').single());
     },
   });
 }
