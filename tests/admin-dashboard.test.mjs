@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention } from '../admin/dashboard-data.js';
+import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, pullRequestAttention, loadPullRequestAttention } from '../admin/dashboard-data.js';
 import { authGateState, isAdminUser } from '../admin/auth-policy.js';
 
 function response(body, status = 200) {
@@ -189,4 +189,14 @@ test('latest main workflows expose failure and do not hide unknown', () => {
   assert.deepEqual(mainWorkflowAttention([run('CI','failure'),run('CI','success'),run('Build','success'),run('Other','failure',old)],sha),[{name:'CI',state:'failure'}]);
   assert.equal(mainWorkflowAttention([],sha),null);
   assert.deepEqual(mainWorkflowAttention([run('CI','neutral')],sha),[{name:'CI',state:'unknown'}]);
+});
+
+test('PR workflow checks use current head and fail closed when missing', async () => {
+  const sha='a'.repeat(40), older='b'.repeat(40);
+  const pulls=[{number:7,head:{sha}}];
+  const run=(head_sha,conclusion)=>({event:'pull_request',head_sha,name:'CI',status:'completed',conclusion});
+  assert.deepEqual(pullRequestAttention(pulls,[run(older,'success')]),[{number:7,state:'unknown'}]);
+  assert.deepEqual(pullRequestAttention(pulls,[run(sha,'failure'),run(sha,'success')]),[{number:7,name:'CI',state:'failure'}]);
+  assert.deepEqual(pullRequestAttention(pulls,[run(sha,'success')]),[]);
+  assert.equal(await loadPullRequestAttention(PROJECTS[0],async()=>{throw Error('offline')}),null);
 });

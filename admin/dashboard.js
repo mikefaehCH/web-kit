@@ -1,4 +1,4 @@
-import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention } from './dashboard-data.js';
+import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, loadPullRequestAttention } from './dashboard-data.js';
 
 const grid = document.querySelector('#project-grid');
 const updated = document.querySelector('#dashboard-updated');
@@ -35,7 +35,7 @@ function cardFor(data, deployment) {
   const state = currentWorkflowState(workflow, data.mainSha);
   const deployed = project.repo === 'web-kit' ? deploymentState(null, data.mainSha, deployment?.commit) : deploymentState(data.pages, data.mainSha, data.pages?.head_sha);
   const workflowProblems = mainWorkflowAttention(data.runs, data.mainSha);
-  const needsAttention = state !== 'success' || workflowProblems === null || workflowProblems.length > 0 || deployed !== 'current' || !issues || Boolean(error) || Boolean(issues?.issues || issues?.pullRequests);
+  const needsAttention = !Array.isArray(data.prAttention) || data.prAttention.length > 0 || state !== 'success' || workflowProblems === null || workflowProblems.length > 0 || deployed !== 'current' || !issues || Boolean(error) || Boolean(issues?.issues || issues?.pullRequests);
   card.dataset.failed = String(state === 'failure');
   card.dataset.attention = String(needsAttention);
   const badge = document.createElement('p');
@@ -112,6 +112,7 @@ async function refresh() {
       const saved = cache.get(project.repo);
       if (saved && now - saved.cachedAt < CACHE_MS) return saved.data;
       const data = await loadProjectData(project).catch(error => ({ project, loadedAt: new Date().toISOString(), issues: null, workflow: null, error: error.message || 'Abruf fehlgeschlagen' }));
+      data.prAttention = await loadPullRequestAttention(project);
       cache.set(project.repo, { data, cachedAt: now });
       return data;
     })), loadDeploymentInfo()]);
@@ -124,6 +125,8 @@ async function refresh() {
       if (state === 'running') problems.push(`${item.project.name}: Main-Workflow läuft`);
       if (state === 'unknown') problems.push(`${item.project.name}: Status des letzten Main-Workflows unbekannt`);
       if (item.issues && (item.issues.issues || item.issues.pullRequests)) problems.push(`${item.project.name}: ${item.issues.pullRequests} offene PR(s), ${item.issues.issues} offene Issues`);
+      if (!Array.isArray(item.prAttention)) problems.push(`${item.project.name}: PR-Prüfungen unbekannt`);
+      else for (const pr of item.prAttention) problems.push(`${item.project.name}: ${pr.number ? 'PR #' + pr.number : 'PR-Liste'}${pr.name ? ' · ' + pr.name : ''} – ${statusLabel(pr.state)}`);
       const workflowProblems = mainWorkflowAttention(item.runs, item.mainSha);
       if (workflowProblems === null) problems.push(`${item.project.name}: einzelne CI-Läufe unbekannt`);
       else for (const run of workflowProblems) problems.push(`${item.project.name}: ${run.name} – ${statusLabel(run.state)}`);
