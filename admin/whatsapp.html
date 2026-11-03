@@ -22,6 +22,24 @@
       </form>
       <button id="reset-password" type="button" class="text-button">Passwort zurücksetzen</button>
       <p id="login-status" role="status" aria-live="polite"></p>
+      <section id="mfa-panel" aria-labelledby="mfa-title" hidden>
+        <h2 id="mfa-title">Zwei-Faktor-Anmeldung</h2>
+        <p id="mfa-instructions"></p>
+        <button id="mfa-enroll" type="button" hidden>Authenticator einrichten</button>
+        <div id="mfa-enrollment" hidden>
+          <p>Scanne den QR-Code mit einer Authenticator-App. Falls das nicht geht, kannst du den Einrichtungsschlüssel manuell eingeben.</p>
+          <img id="mfa-qr" alt="QR-Code für die Authenticator-Einrichtung" hidden>
+          <p>Einrichtungsschlüssel: <code id="mfa-secret"></code></p>
+        </div>
+        <form id="mfa-form" hidden>
+          <label for="mfa-factor" hidden>Authenticator</label>
+          <select id="mfa-factor" hidden></select>
+          <label for="mfa-code">6-stelliger Authenticator-Code</label>
+          <input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required>
+          <button type="submit">Code prüfen</button>
+        </form>
+        <button id="mfa-cancel" type="button" class="secondary" hidden>Abbrechen</button>
+      </section>
       <form id="recovery-form" hidden>
         <h2>Neues Passwort festlegen</h2>
         <label for="new-password">Neues Passwort</label>

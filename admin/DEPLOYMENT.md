@@ -15,9 +15,9 @@ Ein fehlender, nicht lesbarer oder veralteter Status darf nicht als Erfolg inter
 
 ## Login
 
-Supabase Auth verwendet die E-Mail-Adresse als Benutzername und `signInWithPassword`. Es wird kein Passwort in der Anwendung gespeichert oder protokolliert. Die Admin-Rolle stammt ausschliesslich aus `app_metadata.web_kit_admin === true`; Nicht-Admins werden abgemeldet. Öffentliche Registrierung wird nicht angeboten. Der Passwort-Reset erfolgt über den Supabase Auth-E-Mail-Flow. PKCE, persistente Supabase-Session, automatische Token-Erneuerung und Logout bleiben aktiv.
+Supabase Auth verwendet die E-Mail-Adresse als Benutzername und `signInWithPassword`. Zusätzlich ist TOTP-MFA vorgeschrieben: Ohne bestätigten Authenticator oder ohne AAL2 wird das Cockpit nicht angezeigt. Die Edge Function prüft AAL2 serverseitig erneut, bevor Datenbank- oder Provider-Aufrufe möglich sind. TOTP-MFA ist laut aktueller Supabase-Dokumentation auf allen Projekten verfügbar und kostenlos. Es wird kein Passwort oder TOTP-Geheimnis protokolliert; das Einrichtungsschlüsselmaterial erscheint nur während der Ersteinrichtung im persönlichen Browser. Die Admin-Rolle stammt ausschliesslich aus `app_metadata.web_kit_admin === true`; Nicht-Admins werden abgemeldet. Öffentliche Registrierung wird nicht angeboten. Der Passwort-Reset erfolgt über den Supabase Auth-E-Mail-Flow. PKCE, persistente Supabase-Session, automatische Token-Erneuerung und Logout bleiben aktiv.
 
-Laut Plattformprüfung vom 03.11.2026 existiert ein Web-Kit-Admin-Konto mit Passwort. Das bestehende Passwort wurde weder gelesen noch getestet. Ein echter Login bleibt daher bis zu einem autorisierten Anmeldetest unbestätigt. Die projektweite Supabase-Warnung zur Prüfung kompromittierter Passwörter ist noch offen; sie wurde wegen des gemeinsam genutzten Camino-Auth-Projekts nicht geändert.
+Laut Plattformprüfung vom 03.11.2026 existiert ein Web-Kit-Admin-Konto mit Passwort. Das bestehende Passwort wurde weder gelesen noch getestet. Ein echter Login und das einmalige TOTP-Enrolment müssen daher noch mit dem berechtigten Konto im Browser durchgeführt werden. Die projektweite Supabase-Warnung zur Prüfung kompromittierter Passwörter ist noch offen; sie wurde wegen des gemeinsam genutzten Camino-Auth-Projekts nicht geändert.
 
 ## WhatsApp
 

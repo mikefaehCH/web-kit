@@ -10,7 +10,7 @@ const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 const PROVIDER_ID = /^[A-Za-z0-9._:@-]{1,128}$/;
 const PROVIDER_TIMEOUT_MS = 12000;
 
-export type AdminUser = { id: string; app_metadata?: Record<string, unknown> | null };
+export type AdminUser = { id: string; aal?: string | null; app_metadata?: Record<string, unknown> | null };
 export type RpcResult = { data: unknown; error: unknown };
 export type DispatchStatus = "accepted" | "failed" | "unknown";
 
@@ -82,6 +82,8 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   if (!user || typeof user.id !== "string") return json({ error: "Invalid session" }, 401);
   // Admin-Recht nur über vertrauenswürdige app_metadata, nie über user_metadata.
   if (user.app_metadata?.web_kit_admin !== true) return json({ error: "Admin access required" }, 403);
+  // Die Oberfläche fordert TOTP an; diese serverseitige Prüfung verhindert den direkten AAL1-Aufruf.
+  if (user.aal !== "aal2") return json({ error: "Second factor required" }, 403);
 
   const apiToken = deps.env("GREEN_API_TOKEN");
   const instance = deps.env("GREEN_API_INSTANCE_ID") || "710722787774";

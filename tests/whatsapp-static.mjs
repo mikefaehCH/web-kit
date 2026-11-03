@@ -14,6 +14,7 @@ assert.match(js,/review.hidden/);
 assert.match(js,/Authorization:'Bearer '/);
 assert.doesNotMatch(js,/GREEN_API_TOKEN|waInstance/);
 assert.match(edge,/app_metadata\?\.web_kit_admin/);
+assert.match(edge,/user\.aal !== "aal2"/);
 assert.match(edge,/GROUP_ID = "120363431174972238@g.us"/);
 console.log('WhatsApp static checks passed');
 
@@ -31,6 +32,7 @@ assert.match(edge,/web_kit_whatsapp_finish/);
 
 // Befund A: Versandkontrolle nur über service_role, nie mit dem Benutzer-JWT.
 assert.match(edgeIndex,/SUPABASE_SERVICE_ROLE_KEY/);
+assert.match(edgeIndex,/auth\.getClaims\(jwt\)/);
 assert.doesNotMatch(edgeIndex,/headers:\s*\{\s*Authorization/);
 assert.doesNotMatch(edge,/SERVICE_ROLE/);
 assert.match(hardening,/revoke all on function public\.web_kit_whatsapp_finish\(uuid, uuid, text, text\) from public, anon, authenticated/);
@@ -80,5 +82,5 @@ assert.doesNotMatch(auth,/https:\/\/esm\.sh/);
 assert.equal(sdkPackage.dependencies['@supabase/supabase-js'],'2.118.0');
 assert.equal(sdkLock.packages['node_modules/@supabase/supabase-js'].version,'2.118.0');
 assert.match(render,/staticPublishPath: \.\/admin\/dist/);
-assert.match(auth,/flowType:'pkce'/);
+assert.match(auth,/flowType:\s*'pkce'/);
 console.log('Render headers, local SDK and PKCE checks passed');

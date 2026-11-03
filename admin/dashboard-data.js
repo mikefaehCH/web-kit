@@ -46,7 +46,8 @@ function latestMainPush(runs) {
 
 export function workflowState(run) {
   if (!run) return 'unknown';
-  if (run.status !== 'completed') return 'running';
+  if (['queued', 'in_progress', 'requested', 'waiting', 'pending'].includes(run.status)) return 'running';
+  if (run.status !== 'completed') return 'unknown';
   if (run.conclusion === 'success') return 'success';
   if (run.conclusion === 'failure' || run.conclusion === 'timed_out' || run.conclusion === 'cancelled') return 'failure';
   return 'unknown';

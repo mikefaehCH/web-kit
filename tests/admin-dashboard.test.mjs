@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState } from '../admin/dashboard-data.js';
-import { isAdminUser } from '../admin/auth-policy.js';
+import { authGateState, isAdminUser } from '../admin/auth-policy.js';
 
 function response(body, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
@@ -18,6 +18,16 @@ test('admin authorization is exact and cannot be granted by user metadata', () =
   assert.equal(isAdminUser({ app_metadata: { web_kit_admin: 'true' } }), false);
   assert.equal(isAdminUser({ user_metadata: { web_kit_admin: true } }), false);
   assert.equal(isAdminUser(null), false);
+});
+
+test('personal admin requires verified TOTP and AAL2; all other auth states fail closed', () => {
+  const admin = { id: 'admin' };
+  assert.equal(authGateState({ user: null, admin: false }), 'login');
+  assert.equal(authGateState({ user: admin, admin: false, currentLevel: 'aal2', verifiedTotp: true }), 'denied');
+  assert.equal(authGateState({ user: admin, admin: true, verifiedTotp: false }), 'enroll');
+  assert.equal(authGateState({ user: admin, admin: true, verifiedTotp: true, currentLevel: 'aal1', nextLevel: 'aal2' }), 'challenge');
+  assert.equal(authGateState({ user: admin, admin: true, verifiedTotp: true, currentLevel: 'aal2', nextLevel: 'aal2' }), 'ready');
+  assert.equal(authGateState({ user: admin, admin: true, verifiedTotp: true, currentLevel: null, nextLevel: null }), 'blocked');
 });
 
 test('latest eligible main push is classified without treating unknown as success', async () => {
@@ -37,6 +47,8 @@ test('latest eligible main push is classified without treating unknown as succes
   assert.equal(workflowState(data.workflow), 'failure');
   assert.equal(workflowState(null), 'unknown');
   assert.equal(workflowState({ status: 'in_progress' }), 'running');
+  assert.equal(workflowState({ status: 'unrecognized' }), 'unknown');
+  assert.equal(workflowState({}), 'unknown');
   assert.equal(workflowState({ status: 'completed', conclusion: 'neutral' }), 'unknown');
 });
 
@@ -99,10 +111,13 @@ test('static shell has password auth, no public signup, safe DOM rendering and G
   assert.match(html, /type="password" autocomplete="current-password"/);
   assert.match(html, /id="composer"/);
   assert.match(auth, /signInWithPassword/);
+  assert.match(auth, /mfa\.enroll/);
+  assert.match(auth, /mfa\.verify/);
+  assert.match(auth, /getAuthenticatorAssuranceLevel/);
   assert.match(auth, /resetPasswordForEmail/);
   assert.match(auth, /isAdminUser\(user\)/);
-  assert.match(auth, /persistSession:true/);
-  assert.match(auth, /autoRefreshToken:true/);
+  assert.match(auth, /persistSession:\s*true/);
+  assert.match(auth, /autoRefreshToken:\s*true/);
   assert.doesNotMatch(auth, /signUp\(/);
   assert.doesNotMatch(dashboard, /innerHTML|insertAdjacentHTML/);
   assert.match(dashboard, /textContent/);
