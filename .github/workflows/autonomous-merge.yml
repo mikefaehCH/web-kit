@@ -30,7 +30,15 @@ jobs:
 
             # GitHub's merge API enforces the repository's configured required
             # checks and reviews. Never override them or use an admin bypass.
-            gh api --paginate "repos/$GH_REPO/pulls/$pr/files?per_page=100" >/dev/null
+            # Fail closed: until a reviewed path classifier exists, only an
+            # added or modified README may use the unattended merge path.
+            # Other PRs continue through normal reviewed GitHub merging.
+            gh api --paginate --slurp "repos/$GH_REPO/pulls/$pr/files?per_page=100" > files.json
+            jq -e 'flatten | length > 0 and all(.[]; .filename == "README.md" and (.status == "added" or .status == "modified"))' files.json >/dev/null || continue
+
+            # A pending change request is not automatically dismissed.
+            gh api --paginate --slurp "repos/$GH_REPO/pulls/$pr/reviews?per_page=100" > reviews.json
+            jq -e '[flatten | .[] | select(.user.login != null and (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")) | {login: .user.login, state: .state}] | group_by(.login) | all(.[]; (last.state != "CHANGES_REQUESTED"))' reviews.json >/dev/null || continue
             gh api -X PUT "repos/$GH_REPO/pulls/$pr/merge" \
               -f merge_method=squash -f sha="$RUN_SHA" >/dev/null
           done
