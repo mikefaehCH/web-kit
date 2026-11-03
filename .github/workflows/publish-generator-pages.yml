@@ -40,7 +40,7 @@ jobs:
           jq -e '[.[].check_runs[] | select(.app.id == 15368)] as $runs |
             ["repository", "static-check", "edge-function", "database"] |
             all(.[]; . as $name | [$runs[] | select(.name == $name)] |
-              sort_by(.started_at, .id) | last | .status == "completed" and .conclusion == "success")' checks.json >/dev/null
+              sort_by(.id) | last | .status == "completed" and .conclusion == "success")' checks.json >/dev/null
       - name: Test generator and issue handoff
         run: |
           npm --prefix generator test
