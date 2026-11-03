@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "path": "generator/apple-touch-icon.png",
+      "kind": "png",
+      "size": 11596,
+      "sha256": "75920d5c54d0ed2672ea089dc464ce2bf279889e8871d4e5acc8a86f2e3d9093",
+      "provenance": {
+        "source": "git",
+        "repository": "mikefaehCH/Sommer2027",
+        "commit": "ea93234921c3be4dc6aac8c673068af6871beb22",
+        "file": "starter/apple-touch-icon.png"
+      }
+    },
+    {
+      "path": "generator/icon-192.png",
+      "kind": "png",
+      "size": 11437,
+      "sha256": "7717ff351fa798792264147684269be282b5e0c3477954c3cf61a592e616f15b",
+      "provenance": {
+        "source": "git",
+        "repository": "mikefaehCH/Sommer2027",
+        "commit": "ea93234921c3be4dc6aac8c673068af6871beb22",
+        "file": "starter/icon-192.png"
+      }
+    },
+    {
+      "path": "generator/icon-512.png",
+      "kind": "png",
+      "size": 14215,
+      "sha256": "12b40b6b71c1d7a4695fb6e127b4d73a84355c570af94e87677b12fe6e90f0af",
+      "provenance": {
+        "source": "git",
+        "repository": "mikefaehCH/Sommer2027",
+        "commit": "ea93234921c3be4dc6aac8c673068af6871beb22",
+        "file": "starter/icon-512.png"
+      }
+    },
+    {
+      "path": "generator/vendor/leaflet/images/layers-2x.png",
+      "kind": "png",
+      "size": 1259,
+      "sha256": "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf",
+      "provenance": {
+        "source": "npm",
+        "package": "leaflet",
+        "version": "1.9.4",
+        "package_integrity": "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==",
+        "file": "dist/images/layers-2x.png"
+      }
+    },
+    {
+      "path": "generator/vendor/leaflet/images/layers.png",
+      "kind": "png",
+      "size": 696,
+      "sha256": "1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6",
+      "provenance": {
+        "source": "npm",
+        "package": "leaflet",
+        "version": "1.9.4",
+        "package_integrity": "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==",
+        "file": "dist/images/layers.png"
+      }
+    },
+    {
+      "path": "generator/vendor/leaflet/images/marker-icon-2x.png",
+      "kind": "png",
+      "size": 2464,
+      "sha256": "00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528",
+      "provenance": {
+        "source": "npm",
+        "package": "leaflet",
+        "version": "1.9.4",
+        "package_integrity": "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==",
+        "file": "dist/images/marker-icon-2x.png"
+      }
+    },
+    {
+      "path": "generator/vendor/leaflet/images/marker-icon.png",
+      "kind": "png",
+      "size": 1466,
+      "sha256": "574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437",
+      "provenance": {
+        "source": "npm",
+        "package": "leaflet",
+        "version": "1.9.4",
+        "package_integrity": "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==",
+        "file": "dist/images/marker-icon.png"
+      }
+    },
+    {
+      "path": "generator/vendor/leaflet/images/marker-shadow.png",
+      "kind": "png",
+      "size": 618,
+      "sha256": "264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da",
+      "provenance": {
+        "source": "npm",
+        "package": "leaflet",
+        "version": "1.9.4",
+        "package_integrity": "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==",
+        "file": "dist/images/marker-shadow.png"
+      }
+    },
+    {
+      "path": "generator/vendor/leaflet/leaflet.js",
+      "kind": "text",
+      "size": 147552,
+      "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a",
+      "provenance": {
+        "source": "npm",
+        "package": "leaflet",
+        "version": "1.9.4",
+        "package_integrity": "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==",
+        "file": "dist/leaflet.js"
+      }
+    }
+  ]
+}

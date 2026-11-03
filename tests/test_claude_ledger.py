@@ -190,8 +190,9 @@ class LedgerGateTests(unittest.TestCase):
     def fingerprint(self, number):
         pr = self.gh.prs[number]
         with patch.object(rcr, "request_json", self.gh.request_json):
-            _, context, _ = rcr.fetch_pr_and_diff("owner/repo", number, "t", pr["head"], pr["base"])
-        return rcr.review_fingerprint(context)
+            _, context, _, verified = rcr.fetch_pr_and_diff(
+                "owner/repo", number, "t", pr["head"], pr["base"])
+        return rcr.review_fingerprint(context, verified)
 
     def ledger_states(self):
         logical = {"PASS": "success", "FAIL": "failure", "RELEASED": "neutral", "OPEN": None}
