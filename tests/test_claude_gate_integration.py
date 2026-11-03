@@ -153,7 +153,7 @@ class WorkflowSafetyTests(unittest.TestCase):
         self.assertIn("Claude ist ein zusätzlicher, nicht blockierender Reviewer", agents)
         self.assertIn("Autonomy-Release: true", policy)
         self.assertIn("keine GitHub-Approval", policy)
-        self.assertIn("keine Umgehung", policy)
+        self.assertIn("nicht umgehen", policy)
         self.assertIn("Pflichtchecks", policy)
 
     def test_docs_do_not_claim_an_active_gate_and_label_operator_statements(self):
