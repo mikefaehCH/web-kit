@@ -23,7 +23,8 @@ export function safeTotpQrSvg(value) {
 export async function clearStaleTotpEnrollments(mfaApi, friendlyName) {
   const { data, error } = await mfaApi.listFactors();
   if (error) throw error;
-  const staleFactors = (data?.totp || []).filter(factor =>
+  if (!Array.isArray(data?.totp)) throw new Error('Invalid MFA factors response');
+  const staleFactors = data.totp.filter(factor =>
     factor.status === 'unverified' &&
     factor.friendly_name === friendlyName &&
     typeof factor.id === 'string'
