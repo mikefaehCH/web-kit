@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import '../modules/reisekasse.js';
+import {summarizeTrips} from '../modules/trip-ledgers.js';
+const ledger=globalThis.WebKitLedger;
+const trip=(id,person,cents)=>({id,people:[person],rate:1,entries:[{id:'entry',description:'Fixture',cents,currency:'CHF',payer:person,members:[person]}]});
+const a=trip('a','person-a',100),b=trip('b','person-b',200);
+const result=summarizeTrips(ledger,[a,b]);
+assert.equal(result[0].summary.total,100);
+assert.equal(result[1].summary.total,200);
+assert.throws(()=>summarizeTrips(ledger,[a,a]));
+assert.throws(()=>summarizeTrips(ledger,[{...a,entries:[{...a.entries[0],payer:'person-b'}]}]));
+console.log('PASS: multi-trip isolation, duplicate and invalid entries');
