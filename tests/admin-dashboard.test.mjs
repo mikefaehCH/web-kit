@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState } from '../admin/dashboard-data.js';
+import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState } from '../admin/dashboard-data.js';
 import { authGateState, isAdminUser } from '../admin/auth-policy.js';
 
 function response(body, status = 200) {
@@ -71,6 +71,7 @@ test('latest eligible main push is classified without treating unknown as succes
   const fetchImpl = async input => {
     const url = new URL(input);
     if (url.pathname.endsWith('/issues')) return response([{ number: 1 }, { number: 2, pull_request: {} }]);
+    if (url.pathname.endsWith('/commits/main')) return response({ sha: 'a'.repeat(40) });
     return response({ workflow_runs: [
       { event: 'pull_request', head_branch: 'feature', conclusion: 'success' },
       { event: 'push', head_branch: 'main', status: 'completed', conclusion: 'failure', head_sha: 'abc1234', updated_at: '2026-11-03T10:00:00Z' },
@@ -93,10 +94,12 @@ test('GitHub calls are anonymous, host-pinned, redirect-safe and time bounded', 
   const calls = [];
   const fetchImpl = async (input, options) => {
     calls.push({ url: new URL(input), options });
-    return calls.length % 2 ? response([]) : response({ workflow_runs: [] });
+    if (new URL(input).pathname.endsWith('/issues')) return response([]);
+    if (new URL(input).pathname.endsWith('/commits/main')) return response({sha:'a'.repeat(40)});
+    return response({ workflow_runs: [] });
   };
   await loadProjectData(PROJECTS[1], fetchImpl);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   for (const call of calls) {
     assert.equal(call.url.origin, 'https://api.github.com');
     assert.equal(call.options.credentials, 'omit');
@@ -159,4 +162,23 @@ test('static shell has password auth, no public signup, safe DOM rendering and G
   assert.doesNotMatch(dashboard, /innerHTML|insertAdjacentHTML/);
   assert.match(dashboard, /textContent/);
   assert.match(render, /connect-src https:\/\/qoensghjemruqafrbmjd\.supabase\.co https:\/\/api\.github\.com/);
+});
+
+
+test('deployment checks fail closed for missing, failed and stale data', () => {
+  const a='a'.repeat(40), b='b'.repeat(40);
+  assert.equal(deploymentState(null,a,a),'current');
+  assert.equal(deploymentState(null,a,b),'stale');
+  assert.equal(deploymentState(null,null,a),'unknown');
+  assert.equal(deploymentState({status:'completed',conclusion:'failure'},a,a),'failure');
+  assert.equal(deploymentState({status:'in_progress'},a,a),'unknown');
+  assert.equal(deploymentState({status:'completed',conclusion:'success'},a,b),'stale');
+});
+
+test('an old or unverifiable successful CI run is not green', () => {
+  const a='a'.repeat(40), b='b'.repeat(40);
+  const run={status:'completed',conclusion:'success',head_sha:a};
+  assert.equal(currentWorkflowState(run,a),'success');
+  assert.equal(currentWorkflowState(run,b),'unknown');
+  assert.equal(currentWorkflowState(run,null),'unknown');
 });

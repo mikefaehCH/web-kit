@@ -56,20 +56,27 @@ export function workflowState(run) {
 export async function loadProjectData(project, fetchImpl = fetch) {
   if (!PROJECTS.some(knownProject => knownProject.repo === project?.repo)) throw new Error('Unknown project');
   const base = `/repos/${OWNER}/${encodeURIComponent(project.repo)}`;
-  const [itemsResult, runsResult] = await Promise.allSettled([
+  const [itemsResult, runsResult, mainResult] = await Promise.allSettled([
     githubJson(`${base}/issues?state=open&per_page=100`, fetchImpl),
     githubJson(`${base}/actions/runs?branch=main&per_page=100`, fetchImpl),
+    githubJson(`${base}/commits/main`, fetchImpl),
   ]);
-  const result = { project, loadedAt: new Date().toISOString(), issues: null, workflow: null, error: null };
+  const result = { project, loadedAt: new Date().toISOString(), issues: null, workflow: null, mainSha: null, pages: null, error: null };
   const errors = [];
   if (itemsResult.status === 'fulfilled') {
     try { result.issues = splitOpenItems(itemsResult.value); }
     catch (error) { errors.push(error); }
   } else errors.push(itemsResult.reason);
   if (runsResult.status === 'fulfilled') {
-    try { result.workflow = latestMainPush(runsResult.value.workflow_runs); }
+    try {
+      const runs = runsResult.value.workflow_runs;
+      result.workflow = latestMainPush(runs);
+      result.pages = runs.find(run => run.name === 'pages build and deployment' && run.head_branch === 'main') ?? null;
+    }
     catch (error) { errors.push(error); }
   } else errors.push(runsResult.reason);
+  if (mainResult.status === 'fulfilled' && /^[0-9a-f]{40}$/i.test(mainResult.value?.sha || '')) result.mainSha = mainResult.value.sha;
+  else errors.push(mainResult.status === 'rejected' ? mainResult.reason : new Error('Main-Commit unbekannt'));
   if (errors.length) result.error = errors.map(error => error?.message || 'Abruf fehlgeschlagen').join('; ');
   return result;
 }
@@ -93,4 +100,19 @@ export async function loadDeploymentInfo(fetchImpl = fetch) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// A successful build is current only when both full SHAs are known and equal.
+export function deploymentState(run, mainSha, publishedSha) {
+  if (run && workflowState(run) === 'failure') return 'failure';
+  if (run && workflowState(run) !== 'success') return 'unknown';
+  const valid = sha => typeof sha === 'string' && /^[0-9a-f]{40}$/i.test(sha);
+  if (!valid(mainSha) || !valid(publishedSha)) return 'unknown';
+  return mainSha.toLowerCase() === publishedSha.toLowerCase() ? 'current' : 'stale';
+}
+
+export function currentWorkflowState(run, mainSha) {
+  const state = workflowState(run);
+  if (state !== 'success') return state;
+  return deploymentState(null, mainSha, run?.head_sha) === 'current' ? 'success' : 'unknown';
 }
