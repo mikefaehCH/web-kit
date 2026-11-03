@@ -1,11 +1,75 @@
 <!doctype html>
-<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Web-Kit · WhatsApp</title><link rel="stylesheet" href="./whatsapp.css"></head>
-<body><main class="panel"><section id="login-panel" aria-labelledby="login-title"><p class="eyebrow">Geschützter Bereich</p><h1 id="login-title">Administration</h1><p>Mit deiner registrierten E-Mail-Adresse anmelden.</p><form id="login-form"><label for="email">E-Mail-Adresse</label><input id="email" type="email" autocomplete="email" required placeholder="name@beispiel.ch"><button type="submit">Anmeldelink senden</button></form><p id="login-status" role="status" aria-live="polite"></p></section><div id="workspace" hidden><nav aria-label="Admin-Navigation"><a href="#composer">Kommunikation</a><button type="button" id="logout" class="secondary">Abmelden</button></nav><p id="identity" class="hint"></p><p class="eyebrow">Web-Kit · Admin</p><h1>WhatsApp-Nachricht</h1><p>Manueller Versand an die Camino-Gruppe.</p>
-<form id="composer"><label for="recipient">Empfänger</label><input id="recipient" value="Camino" readonly>
-<label for="message">Nachricht</label><textarea id="message" rows="7" maxlength="4000" required placeholder="Deine Nachricht an die Gruppe …"></textarea>
-<div class="counter"><output id="count">0</output> / 4000 Zeichen</div>
-<button id="send" type="submit" disabled>Nachricht prüfen</button></form>
-<section id="review" hidden aria-labelledby="review-title"><h2 id="review-title">Versand bestätigen</h2><p>Empfänger: <strong>Camino</strong></p><pre id="preview"></pre><div class="actions"><button id="confirm" type="button">Jetzt senden</button><button id="cancel" type="button" class="secondary">Abbrechen</button></div></section>
-<p id="status" role="status" aria-live="polite"></p>
-<p class="hint">Der Versand erfordert einen geschützten, für Administratoren freigegebenen Server-Endpunkt. Zugangsdaten gehören niemals in den Browser.</p></div></main>
-<script type="module" src="./auth.js"></script><script type="module" src="./whatsapp.js"></script></body></html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f4f6f3">
+  <title>Web-Kit · Cockpit</title>
+  <link rel="stylesheet" href="./whatsapp.css">
+</head>
+<body>
+  <main class="panel">
+    <section id="login-panel" aria-labelledby="login-title">
+      <p class="eyebrow">Persönlicher, geschützter Bereich</p>
+      <h1 id="login-title">Administration</h1>
+      <p>Mit deinem Admin-Benutzernamen (E-Mail-Adresse) und Passwort anmelden.</p>
+      <form id="login-form">
+        <label for="email">Benutzername (E-Mail-Adresse)</label>
+        <input id="email" type="email" autocomplete="username" required placeholder="name@beispiel.ch">
+        <label for="password">Passwort</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <button type="submit">Anmelden</button>
+      </form>
+      <button id="reset-password" type="button" class="text-button">Passwort zurücksetzen</button>
+      <p id="login-status" role="status" aria-live="polite"></p>
+      <form id="recovery-form" hidden>
+        <h2>Neues Passwort festlegen</h2>
+        <label for="new-password">Neues Passwort</label>
+        <input id="new-password" type="password" autocomplete="new-password" minlength="12" required>
+        <label for="confirm-password">Passwort wiederholen</label>
+        <input id="confirm-password" type="password" autocomplete="new-password" minlength="12" required>
+        <button type="submit">Passwort speichern</button>
+      </form>
+    </section>
+
+    <section id="workspace" hidden>
+      <nav aria-label="Admin-Navigation">
+        <a href="#cockpit">Cockpit</a>
+        <a href="#communication">Kommunikation</a>
+        <button type="button" id="logout" class="secondary">Abmelden</button>
+      </nav>
+      <p id="identity" class="hint"></p>
+      <section id="cockpit" aria-labelledby="dashboard-title">
+        <div class="dashboard-heading">
+          <div><p class="eyebrow">Persönliche Übersicht</p><h1 id="dashboard-title">Projekt-Cockpit</h1></div>
+          <button id="refresh-dashboard" type="button" class="secondary">Aktualisieren</button>
+        </div>
+        <p id="dashboard-updated" class="hint" role="status" aria-live="polite">Daten noch nicht geladen.</p>
+        <p class="dashboard-note">GitHub-Status wird öffentlich und ohne Token gelesen. Website-Erreichbarkeit und Render-Deployment werden hier nicht live geprüft.</p>
+        <div class="filter-row"><label for="project-filter">Ansicht</label><select id="project-filter"><option value="all">Alle Projekte</option><option value="attention">Nur zu prüfen</option><option value="failed">Fehlgeschlagene CI</option></select></div>
+        <section id="attention" class="attention" aria-labelledby="attention-title" hidden>
+          <h2 id="attention-title">Zu prüfen</h2><ul id="attention-list"></ul>
+        </section>
+        <section id="project-grid" class="project-grid" aria-label="Projekte"></section>
+      </section>
+
+      <section id="communication" class="communication" aria-labelledby="communication-title">
+        <p class="eyebrow">Manueller Versand</p><h2 id="communication-title">WhatsApp-Nachricht</h2>
+        <p>Manueller Versand an die Camino-Gruppe.</p>
+        <form id="composer">
+          <label for="recipient">Empfänger</label><input id="recipient" value="Camino" readonly>
+          <label for="message">Nachricht</label><textarea id="message" rows="7" maxlength="4000" required placeholder="Deine Nachricht an die Gruppe …"></textarea>
+          <div class="counter"><output id="count">0</output> / 4000 Zeichen</div>
+          <button id="send" type="submit" disabled>Nachricht prüfen</button>
+        </form>
+        <section id="review" hidden aria-labelledby="review-title"><h3 id="review-title">Versand bestätigen</h3><p>Empfänger: <strong>Camino</strong></p><pre id="preview"></pre><div class="actions"><button id="confirm" type="button">Jetzt senden</button><button id="cancel" type="button" class="secondary">Abbrechen</button></div></section>
+        <p id="status" role="status" aria-live="polite"></p>
+        <p class="hint">Versand läuft ausschliesslich über die geschützte Supabase-Funktion. Zugangsdaten gehören niemals in den Browser.</p>
+      </section>
+    </section>
+  </main>
+  <script type="module" src="./auth.js"></script>
+  <script type="module" src="./dashboard.js"></script>
+  <script type="module" src="./whatsapp.js"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { copyFile, mkdir, rm } from 'node:fs/promises';
+import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -6,6 +6,9 @@ const root = dirname(fileURLToPath(import.meta.url));
 const output = join(root, 'dist');
 const files = [
   'auth.js',
+  'auth-policy.js',
+  'dashboard.js',
+  'dashboard-data.js',
   'whatsapp.css',
   'whatsapp.html',
   'whatsapp.js',
@@ -20,3 +23,10 @@ for (const relativePath of files) {
   await mkdir(dirname(target), { recursive: true });
   await copyFile(join(root, relativePath), target);
 }
+
+const renderCommit = process.env.RENDER_GIT_COMMIT;
+const renderBranch = process.env.RENDER_GIT_BRANCH;
+const deployment = /^[0-9a-f]{40}$/i.test(renderCommit || '')
+  ? { commit: renderCommit.toLowerCase(), branch: /^[A-Za-z0-9._/-]{1,100}$/.test(renderBranch || '') ? renderBranch : null, builtAt: new Date().toISOString() }
+  : { commit: null, branch: null, builtAt: null };
+await writeFile(join(output, 'deployment.json'), `${JSON.stringify(deployment)}\n`, { encoding: 'utf8', mode: 0o644 });
