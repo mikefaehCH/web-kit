@@ -1,0 +1,40 @@
+name: Independent browser review
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/independent-browser-review.yml'
+      - 'tests/independent-browser-review.cjs'
+permissions:
+  contents: read
+jobs:
+  cross-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: mikefaehCH/edinburgh
+          ref: 1c7107e986d7bbf1adbd84afbbf6ed8d1c13addc
+          path: edinburgh-base
+      - uses: actions/checkout@v4
+        with:
+          repository: mikefaehCH/edinburgh
+          ref: 7a6c4ba7b8821ef5bb1ac8b277f35f97f2c808a3
+          path: edinburgh-head
+      - uses: actions/checkout@v4
+        with:
+          repository: mikefaehCH/Valencia
+          ref: ba90b22e507a00dfde1eab252f56a75cbfd500fe
+          path: valencia-base
+      - uses: actions/checkout@v4
+        with:
+          repository: mikefaehCH/Valencia
+          ref: 209e5632dba17c3ec5bded1b426a5fa2475c7c73
+          path: valencia-head
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --ignore-scripts playwright@1.56.1
+      - run: npx playwright install --with-deps chromium webkit
+      - run: node tests/independent-browser-review.cjs
