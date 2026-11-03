@@ -149,13 +149,12 @@ class WorkflowSafetyTests(unittest.TestCase):
     def test_policy_has_guarded_bootstrap_and_conditional_approval_replacement(self):
         policy = Path("RELEASE_POLICY.md").read_text(encoding="utf-8")
         agents = Path("AGENTS.md").read_text(encoding="utf-8")
-        self.assertIn("Einzige Bootstrap-Ausnahme", policy)
-        self.assertIn("Approval erst, wenn ein gültiger Live-PASS", policy)
-        self.assertIn("keine Approval und kein Gate-PASS", policy)
-        self.assertIn("Ausschliesslich PR #9", policy)
-        self.assertIn("erlischt mit dem Merge von PR #9", policy)
-        self.assertIn("Bootstrap-Ausnahme", agents)
-        self.assertIn("erlischt mit dem Merge von PR #9", agents)
+        self.assertIn("Claude ist kein Pflicht-Merge-Gate", policy)
+        self.assertIn("Claude ist ein zusätzlicher, nicht blockierender Reviewer", agents)
+        self.assertIn("Autonomy-Release: true", policy)
+        self.assertIn("keine GitHub-Approval", policy)
+        self.assertIn("keine Umgehung", policy)
+        self.assertIn("Pflichtchecks", policy)
 
     def test_docs_do_not_claim_an_active_gate_and_label_operator_statements(self):
         gate = Path("docs/CLAUDE_REVIEW_GATE.md").read_text(encoding="utf-8")
