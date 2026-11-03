@@ -16,7 +16,17 @@ export function safeTotpQrSvg(value) {
   if (typeof value !== 'string' || value.length > 100_000) return null;
   const svg = value.trim().replace(/^\uFEFF/, '').replace(/^<\?xml[^>]*>\s*/i, '');
   if (!/^<svg(?:\s|>)/i.test(svg) || !/<\/svg>\s*$/i.test(svg)) return null;
-  if (/<!DOCTYPE|<!ENTITY|<script|<foreignObject|\bon[a-z]+\s*=|(?:href|src)\s*=|url\s*\(|style\s*=/i.test(svg)) return null;
+  if (/<!DOCTYPE|<!ENTITY|url\s*\(/i.test(svg)) return null;
+  const safeTags = /<(\/?)(svg|g|path|rect)\b([^>]*)>/gi;
+  const tokens = [...svg.matchAll(safeTags)];
+  if (!tokens.length || svg.replace(safeTags, '').replace(/\s/g, '').length) return null;
+  for (const [, closing, , attributes] of tokens) {
+    if (closing) {
+      if (attributes.trim()) return null;
+      continue;
+    }
+    if (!/^(?:\s+(?:xmlns|width|height|viewBox|fill|d|x|y|shape-rendering)="[^"<]*")*\s*\/?$/.test(attributes)) return null;
+  }
   return svg;
 }
 
