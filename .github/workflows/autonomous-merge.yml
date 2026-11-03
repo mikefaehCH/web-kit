@@ -38,7 +38,7 @@ jobs:
 
             # A pending change request is not automatically dismissed.
             gh api --paginate --slurp "repos/$GH_REPO/pulls/$pr/reviews?per_page=100" > reviews.json
-            jq -e '[flatten | .[] | select(.user.login != null) | {login: .user.login, state: .state}] | group_by(.login) | all(.[]; (last.state != "CHANGES_REQUESTED"))' reviews.json >/dev/null || continue
+            jq -e '[flatten | .[] | select(.user.login != null and (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")) | {login: .user.login, state: .state}] | group_by(.login) | all(.[]; (last.state != "CHANGES_REQUESTED"))' reviews.json >/dev/null || continue
             gh api -X PUT "repos/$GH_REPO/pulls/$pr/merge" \
               -f merge_method=squash -f sha="$RUN_SHA" >/dev/null
           done
