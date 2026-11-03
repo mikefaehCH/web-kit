@@ -1,0 +1,9 @@
+{
+  "name": "travel-starter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.mjs",
+    "create": "node scripts/create.mjs"
+  }
+}

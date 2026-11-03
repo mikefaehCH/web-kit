@@ -1,0 +1,10 @@
+{
+  "id": "travel",
+  "label": "Reise",
+  "contract": "dated-places",
+  "presets": [
+    { "id": "city", "label": "Städtereise" },
+    { "id": "walking", "label": "Wanderreise" }
+  ],
+  "modules": ["places", "map", "favorites", "planning", "offline"]
+}

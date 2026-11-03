@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="de-CH">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"
+    />
+    <meta name="theme-color" content="#28594f" />
+    <meta
+      name="description"
+      content="Eine wiederverwendbare Reisevorlage mit Orten, Karte und persönlichem Plan."
+    />
+    <title>Reisevorlage</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="stylesheet" href="./vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="./style.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Zum Inhalt</a>
+    <header>
+      <div class="topline">
+        <a href="./">Reisebegleiter</a
+        ><label id="trip-picker"
+          >Beispielreise
+          <select id="trip-select" aria-label="Beispielreise"></select
+        ></label>
+      </div>
+      <p class="eyebrow">Entdecken. Auswählen. Unterwegs sein.</p>
+      <h1 id="title">Deine nächste Reise</h1>
+      <p id="description"></p>
+      <p id="dates"></p>
+      <nav aria-label="Reisebereiche">
+        <a id="places-link" href="#places">Entdecken</a
+        ><a id="map-link" href="#map-section">Karte</a
+        ><a id="plan-link" href="#planning">Mein Plan</a>
+      </nav>
+    </header>
+    <main id="main">
+      <p id="feedback" role="status" aria-live="polite"></p>
+      <section id="places" aria-labelledby="places-title">
+        <p class="eyebrow">Raum für Entdeckungen</p>
+        <h2 id="places-title">Was möchtest du erleben?</h2>
+        <div class="filters">
+          <label>Suchen<input id="search" type="search" placeholder="Ort oder Aktivität" /></label
+          ><label
+            >Kategorie<select id="category">
+              <option value="">Alle Kategorien</option>
+            </select></label
+          ><label id="favorites-filter"
+            ><input id="favorites-only" type="checkbox" /> Nur Favoriten</label
+          >
+        </div>
+        <p id="count" role="status"></p>
+        <div id="place-list" class="cards"></div>
+      </section>
+      <section id="map-section" aria-labelledby="map-title">
+        <p class="eyebrow">Den Überblick behalten</p>
+        <h2 id="map-title">Deine Orte auf der Karte</h2>
+        <div id="map" aria-label="Karte mit den gefilterten Orten"></div>
+      </section>
+      <section id="planning" aria-labelledby="plan-title">
+        <p class="eyebrow">Zeit für das Wesentliche</p>
+        <h2 id="plan-title">Mein Plan</h2>
+        <p>
+          Auf diesem Gerät gespeichert. Mit einem Export kannst du deinen Plan sichern oder
+          weitergeben.
+        </p>
+        <div id="plan-list"></div>
+        <div class="actions">
+          <button id="export" type="button">Plan exportieren</button
+          ><label class="file-label"
+            >Plan importieren<input id="import" type="file" accept="application/json,.json"
+          /></label>
+        </div>
+        <p id="import-review" hidden></p>
+        <button id="confirm-import" type="button" hidden>Bestehenden Plan ersetzen</button>
+      </section>
+      <section id="offline-section">
+        <h2>Auch unterwegs dabei</h2>
+        <p id="offline-status" role="status">Offline-Nutzung wird vorbereitet.</p>
+        <p>
+          Nach dem ersten vollständigen Laden sind Orte und lokale Planung offline verfügbar.
+          Kartenkacheln benötigen Internet.
+        </p>
+      </section>
+    </main>
+    <footer>Reisevorlage · Persönliche Planung ohne Anmeldung · <span id="trip-id"></span></footer>
+  </body>
+</html>

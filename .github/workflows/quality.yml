@@ -19,7 +19,14 @@ jobs:
           test -s AGENTS.md
           test -s RELEASE_POLICY.md
           test -f .github/workflows/autonomous-merge.yml
+          test -s generator/VERSION.json
       - name: Test Claude review verdict validator
         run: python3 -m unittest discover -s tests -p 'test_claude_*'
-      - name: Explicit limitation
-        run: echo 'Scaffold quality only; no generator, E2E or deployment validation yet.'
+      - name: Node.js 22 (pinned)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Test versioned generator and CLI demo end to end
+        run: npm --prefix generator test
+      - name: Explicit deployment limitation
+        run: echo 'Generator and CLI demo are tested; no public web-kit deployment is configured yet.'

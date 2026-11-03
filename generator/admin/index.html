@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="de-CH">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Website-Wizard – lokale Vorschau</title>
+    <link rel="stylesheet" href="./wizard.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Website-Baukasten</p>
+        <h1>Neue Website konfigurieren</h1>
+        <p>
+          Lokaler Entwurf ohne Login, Cloud-Speicherung oder Veröffentlichung. Exportiert eine
+          geprüfte site.json und erstellt deine Website als ZIP.
+        </p>
+      </header>
+      <label class="note"
+        >site.json importieren (ersetzt den aktuellen Entwurf)
+        <input type="file" id="site-import" accept=".json,application/json" />
+      </label>
+      <form id="wizard">
+        <label>Kategorie<select name="category"></select></label>
+        <label>Vorlage<select name="preset"></select></label>
+        <label
+          >Projekt-ID<input
+            name="id"
+            value="meine-website"
+            required
+            maxlength="64"
+            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+        /></label>
+        <label>Titel<input name="title" value="Meine Website" required maxlength="100" /></label>
+        <label
+          >Beschreibung<textarea name="description" maxlength="500" rows="3" required></textarea>
+        </label>
+        <label
+          >Sprache der Inhalte / Datumsformat<select name="locale">
+            <option value="de-CH">Deutsch (Schweiz)</option>
+            <option value="en">Englisch</option>
+            <option value="es">Spanisch</option>
+          </select></label
+        >
+        <label>Akzentfarbe<input name="color" type="color" value="#965a3e" /></label>
+        <label data-travel-only>Beginn<input name="start" type="date" required /></label>
+        <label data-travel-only>Ende<input name="end" type="date" required /></label>
+        <fieldset>
+          <legend>Module</legend>
+          <label><input type="checkbox" name="places" checked /> Orte</label
+          ><label><input type="checkbox" name="map" checked /> Karte</label
+          ><label><input type="checkbox" name="favorites" checked /> Favoriten</label
+          ><label><input type="checkbox" name="planning" checked /> Planung</label
+          ><label><input type="checkbox" name="offline" checked /> Offline</label>
+        </fieldset>
+        <section data-travel-only aria-label="Orte erfassen">
+          <h2>Orte</h2>
+          <p>Nur eigene, geprüfte Angaben eintragen. Ohne Orte bleibt die Liste leer.</p>
+          <div id="places-editor"></div>
+          <button type="button" id="add-place">Ort hinzufügen</button>
+        </section>
+        <section data-general-only aria-label="Abschnitte erfassen" hidden>
+          <h2>Inhalte</h2>
+          <div id="sections-editor"></div>
+          <button type="button" id="add-section">Abschnitt hinzufügen</button>
+        </section>
+        <div class="actions">
+          <button type="submit">Konfiguration prüfen</button
+          ><button type="button" id="download" disabled>site.json herunterladen</button>
+          <button type="button" id="create" disabled>Website erstellen</button>
+        </div>
+        <p id="message" role="status" aria-live="polite"></p>
+      </form>
+      <section aria-label="Vorschau">
+        <h2>Vorschau</h2>
+        <div class="preview" id="preview">
+          <h3>Meine Website</h3>
+          <p>Deine Beschreibung erscheint hier.</p>
+        </div>
+      </section>
+      <p class="note">
+        Alle eingegebenen Inhalte landen in öffentlichen Website-Dateien. Keine privaten
+        Buchungsdaten eintragen. ZIP-Erstellung erfolgt auf deinem Gerät; Vorlagendateien werden vom
+        selben Webserver geladen. Kein Login und keine Veröffentlichung.
+      </p>
+    </main>
+    <script type="module" src="./bootstrap.js"></script>
+  </body>
+</html>

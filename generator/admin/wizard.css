@@ -1,0 +1,145 @@
+:root {
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  color: #25332f;
+  background: #f7f6f2;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 850px;
+  margin: auto;
+  padding: 32px 20px 64px;
+}
+h1 {
+  font-size: clamp(1.8rem, 5vw, 3rem);
+  margin: 0.3em 0;
+}
+header p {
+  max-width: 64ch;
+  line-height: 1.5;
+}
+.eyebrow {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+form {
+  background: white;
+  border: 1px solid #dddcd5;
+  border-radius: 14px;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+input,
+textarea,
+select {
+  font: inherit;
+  padding: 12px;
+  border: 1px solid #767c79;
+  border-radius: 8px;
+  max-width: 100%;
+}
+input[type='color'] {
+  height: 50px;
+  width: 100px;
+  padding: 4px;
+}
+fieldset {
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+fieldset label {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+}
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+button {
+  font: inherit;
+  border: 1px solid #25332f;
+  background: #25332f;
+  color: white;
+  padding: 12px 18px;
+  min-height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #966138;
+  outline-offset: 2px;
+}
+#message {
+  min-height: 1.5em;
+  color: #773c22;
+}
+.preview {
+  border: 1px solid #dddcd5;
+  border-top: 8px solid #965a3e;
+  border-radius: 12px;
+  background: white;
+  padding: 24px;
+  overflow-wrap: anywhere;
+}
+.note {
+  font-size: 0.9rem;
+  color: #485450;
+  line-height: 1.5;
+}
+
+[hidden] {
+  display: none !important;
+}
+.content-row {
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-block: 12px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+input,
+textarea,
+select {
+  min-width: 0;
+  width: 100%;
+}
+input[type='checkbox'] {
+  width: 20px;
+}
+input[type='file'] {
+  margin-block: 12px;
+}

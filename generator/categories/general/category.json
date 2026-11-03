@@ -1,0 +1,7 @@
+{
+  "id": "general",
+  "label": "Allgemein",
+  "contract": "sections",
+  "presets": [{ "id": "info-page", "label": "Infoseite" }],
+  "modules": ["offline"]
+}

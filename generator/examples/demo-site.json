@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "category": "general",
+  "preset": "info-page",
+  "id": "web-kit-demo",
+  "title": "Web-kit Demo",
+  "description": "Fiktive Referenzseite für den reproduzierbaren Generator-Test.",
+  "color": "#965a3e",
+  "locale": "de-CH",
+  "modules": {
+    "places": false,
+    "map": false,
+    "favorites": false,
+    "planning": false,
+    "offline": true
+  },
+  "content": {
+    "sections": [
+      {
+        "heading": "Reproduzierbar erstellt",
+        "text": "Diese Seite enthält ausschliesslich fiktive Testinhalte."
+      }
+    ]
+  }
+}
