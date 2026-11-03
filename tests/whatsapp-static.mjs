@@ -7,6 +7,7 @@ const css=readFileSync(new URL('../admin/whatsapp.css',import.meta.url),'utf8');
 const edgeIndex=readFileSync(new URL('../supabase/functions/web-kit-whatsapp-send/index.ts',import.meta.url),'utf8');
 const edge=readFileSync(new URL('../supabase/functions/web-kit-whatsapp-send/handler.ts',import.meta.url),'utf8');
 const hardening=readFileSync(new URL('../supabase/migrations/20261102061405_web_kit_whatsapp_service_role_only.sql',import.meta.url),'utf8');
+assert.match(html,/<meta name="robots" content="noindex, nofollow">/);
 assert.match(html,/id="message"/);
 assert.match(html,/id="review"/);
 assert.match(html,/maxlength="4000"/);
