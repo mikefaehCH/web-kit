@@ -17,7 +17,7 @@ Ein fehlender, nicht lesbarer oder veralteter Status darf nicht als Erfolg inter
 
 Supabase Auth verwendet die E-Mail-Adresse als Benutzername und `signInWithPassword`. Zusätzlich ist TOTP-MFA vorgeschrieben: Ohne bestätigten Authenticator oder ohne AAL2 wird das Cockpit nicht angezeigt. Die Edge Function prüft AAL2 serverseitig erneut, bevor Datenbank- oder Provider-Aufrufe möglich sind. TOTP-MFA ist laut aktueller Supabase-Dokumentation auf allen Projekten verfügbar und kostenlos. Es wird kein Passwort oder TOTP-Geheimnis protokolliert; das Einrichtungsschlüsselmaterial erscheint nur während der Ersteinrichtung im persönlichen Browser. Die Admin-Rolle stammt ausschliesslich aus `app_metadata.web_kit_admin === true`; Nicht-Admins werden abgemeldet. Öffentliche Registrierung wird nicht angeboten. Der Passwort-Reset erfolgt über den Supabase Auth-E-Mail-Flow. PKCE, persistente Supabase-Session, automatische Token-Erneuerung und Logout bleiben aktiv.
 
-Laut Plattformprüfung vom 03.11.2026 existiert ein Web-Kit-Admin-Konto mit Passwort. Das bestehende Passwort wurde weder gelesen noch getestet. Ein echter Login und das einmalige TOTP-Enrolment müssen daher noch mit dem berechtigten Konto im Browser durchgeführt werden. Die projektweite Supabase-Warnung zur Prüfung kompromittierter Passwörter ist noch offen; sie wurde wegen des gemeinsam genutzten Camino-Auth-Projekts nicht geändert.
+Mike bestätigte am 03.11.2026, dass Admin-Login mit TOTP und ein echter WhatsApp-Versand erfolgreich waren. Diese Bestätigung stammt vom Betreiber; bei dieser späteren Bestandsprüfung wurde kein Login durchgeführt und keine Nachricht versendet. Die projektweite Supabase-Warnung zur Prüfung kompromittierter Passwörter wurde wegen des gemeinsam genutzten Camino-Auth-Projekts nicht geändert.
 
 ## WhatsApp
 
@@ -25,6 +25,10 @@ Versand läuft ausschliesslich über `web-kit-whatsapp-send`. Die bestehende Adm
 
 ## Render-Plattform
 
-Laut Render-Abfrage vom 03.11.2026: Static Site `web-kit-admin`, Service-ID `srv-dbkagf1srm7s739t6230`, HTTPS-URL oben, Deployment aus `main` nach erfolgreichen CI-Checks (`checksPass`), Starter-Plan. Ein Release ist erst bestätigt, wenn der konkrete Commit im Render-Dashboard als deployed angezeigt und die Produktions-Smokes durchgeführt wurden.
+Laut Render-Abfrage vom 03.11.2026 ist `web-kit-admin` eine Static Site (Service-ID `srv-dbkagf1srm7s739t6230`) für `main`. Der Service zeigt `autoDeployTrigger=checksPass`; seine Quelle ist aber eine öffentliche Git-Repository-URL. [Render dokumentiert](https://render.com/docs/deploys), dass Dienste mit öffentlicher Git-URL manuell deployed werden müssen. Daher belegt `checksPass` bei dieser Service-Quelle allein keinen automatischen Deploy nach dem Merge.
 
-Es wurden für das Cockpit keine Secrets, Render-Dienste, Supabase-Schemata oder produktiven Daten geändert. Es ist keine SQL-Migration nötig.
+Der geprüfte Ablauf ist: Pflichtchecks auf dem exakten Merge-Commit erfolgreich ausführen, den Render-Deploy auslösen und danach den tatsächlichen Deployment-Commit sowie Produktions-Smokes prüfen. Ein neuer GitHub-Integrationszugriff könnte automatische Deploys ermöglichen, wurde hier aber nicht eingerichtet oder autorisiert.
+
+## Daten und Änderungen
+
+Für diese Dokumentationskorrektur wurden keine Secrets, Render-Dienste, Supabase-Schemata oder produktiven Daten geändert. Es war keine SQL-Migration nötig.
