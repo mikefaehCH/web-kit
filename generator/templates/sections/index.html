@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="de-CH">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="theme-color" content="#965a3e" />
+    <meta name="description" content="Allgemeine Infoseite" />
+    <title>Infoseite</title>
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body class="info-page">
+    <a class="skip" href="#main">Zum Inhalt</a>
+    <header>
+      <h1 id="title"></h1>
+      <p id="description"></p>
+    </header>
+    <main id="main">
+      <div id="sections"></div>
+      <p id="offline-status" role="status"></p>
+    </main>
+  </body>
+</html>
