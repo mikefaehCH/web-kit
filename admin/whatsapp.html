@@ -74,15 +74,15 @@
 
       <section id="communication" class="communication" aria-labelledby="communication-title" hidden>
         <p class="eyebrow">Manueller Versand</p><h1 id="communication-title">WhatsApp-Nachricht</h1>
-        <p>Wähle Kontakte oder Gruppen und prüfe die Nachricht vor dem Versand.</p>
-        <details id="contacts-panel"><summary>WhatsApp-Kontakte und Gruppen auswählen</summary>
+        <p role="status">Der WhatsApp-Versand ist vorübergehend nicht verfügbar. Die Absicherung wird ergänzt.</p>
+        <details id="contacts-panel" hidden><summary>WhatsApp-Kontakte und Gruppen auswählen</summary>
           <p class="hint">Die Liste wird nur auf Anfrage geladen. Einzelne Kontakte erhalten die Nachricht separat.</p>
           <button type="button" id="load-contacts" class="secondary">Kontakte laden</button>
           <p id="contacts-status" role="status" aria-live="polite"></p>
           <label for="contacts-search">Kontakte durchsuchen</label><input type="search" id="contacts-search" autocomplete="off" placeholder="Name oder Nummer">
           <ul id="contacts-list"></ul>
         </details>
-        <form id="composer">
+        <form id="composer" hidden>
           <fieldset id="recipient-options"><legend>Empfänger</legend><label><input type="checkbox" id="camino-recipient" checked> Camino-Gruppe</label></fieldset>
           <label for="message">Nachricht</label><textarea id="message" rows="7" maxlength="4000" required placeholder="Deine Nachricht an die Gruppe …"></textarea>
           <div class="counter"><output id="count">0</output> / 4000 Zeichen</div>

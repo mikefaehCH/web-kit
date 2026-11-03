@@ -45,36 +45,7 @@ form.addEventListener('submit',event=>{
 });
 cancel.addEventListener('click',()=>{invalidate();send.focus();});
 if(hasInterrupted())status.textContent='Ein vorheriger Versand wurde unterbrochen. Bitte prüfe in WhatsApp, welche Nachrichten angekommen sind, bevor du erneut sendest.';
-confirm.addEventListener('click',async()=>{
-  if(pending||review.hidden||!approvedMessage||message.value.trim()!==approvedMessage||!approvedRecipients.length)return;
-  if(typeof endpoint!=='string'||!endpoint.startsWith('https://')||typeof getToken!=='function'){status.textContent='Versand ist noch nicht eingerichtet.';return;}
-  pending=true;confirm.disabled=true;send.disabled=true;cancel.disabled=true;message.disabled=true;camino.disabled=true;
-  let token;try{token=await getToken();}catch{token=null;}if(!token){pending=false;confirm.disabled=false;cancel.disabled=false;message.disabled=false;camino.disabled=false;invalidate();status.textContent='Bitte zuerst als Administrator anmelden.';return;}
-  document.querySelectorAll('.contact-choice').forEach(el=>{el.disabled=true;});
-  results.replaceChildren();status.textContent='Nachrichten werden einzeln übermittelt …';
-  let interrupted=false;
-  try{
-    sessionStorage.setItem(interruptedKey,'1');
-    for(const recipient of approvedRecipients){
-      const item=textItem(results,recipient.name+': wird übermittelt …');
-      try{
-        const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,'apikey':'sb_publishable_Qeom38G18vSgrrE5MxoXEw_LhJM1f6S'},body:JSON.stringify({action:'send_selected',chatId:recipient.id,message:approvedMessage,requestKey:recipient.key})});
-        const body=await response.json().catch(()=>null);
-        if(response.ok&&body?.status==='accepted'){item.textContent=recipient.name+': vom WhatsApp-Dienst angenommen (Zustellung nicht bestätigt).';continue;}
-        if(response.status===502&&body?.status==='failed'){item.textContent=recipient.name+': vom Dienst abgelehnt.';continue;}
-        item.textContent=recipient.name+': Status unklar oder Versand blockiert. Vor erneutem Senden in WhatsApp prüfen.';
-        interrupted=true;break;
-      }catch{item.textContent=recipient.name+': Status unklar. Vor erneutem Senden in WhatsApp prüfen.';interrupted=true;break;}
-    }
-    status.textContent=interrupted?'Versand angehalten. Weitere Empfänger wurden nicht verarbeitet.':'Versand abgeschlossen. Annahme ist keine Zustellbestätigung.';
-    if(!interrupted)sessionStorage.removeItem(interruptedKey);
-  }catch{status.textContent='Versand nicht gestartet oder unterbrochen. Bitte WhatsApp prüfen.';}
-  finally{
-    pending=false;confirm.disabled=false;cancel.disabled=false;message.disabled=false;camino.disabled=false;
-    document.querySelectorAll('.contact-choice').forEach(el=>{el.disabled=false;});
-    invalidate();showInterrupted();
-  }
-});
+confirm.addEventListener('click',()=>{ status.textContent='Der Versand ist vorübergehend nicht verfügbar.'; });
 // Die Ansicht lädt nur auf ausdrückliche Anforderung und speichert keine Kontakte dauerhaft.
 const contactsList=document.querySelector('#contacts-list');
 const contactsStatus=document.querySelector('#contacts-status');
