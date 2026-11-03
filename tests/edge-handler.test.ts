@@ -58,6 +58,7 @@ test("legitimer Admin-Versand: claim, fixe Gruppe, finish accepted via service_r
   assert.equal(body.ok, true);
   assert.equal(body.status, "accepted");
   assert.equal(t.fetches.length, 1);
+  assert.equal(t.fetches[0].redirect, "error");
   assert.deepEqual(t.fetches[0].body, { chatId: GROUP_ID, message: "Hallo Camino" });
   assert.deepEqual(t.rpc.map((c) => c.fn), ["web_kit_whatsapp_claim", "web_kit_whatsapp_finish"]);
   assert.equal(t.rpc[0].args.p_actor, ADMIN.id);
