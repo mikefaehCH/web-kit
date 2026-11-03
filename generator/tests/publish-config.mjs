@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const read = (path) => readFile(new URL(path, new URL('../', import.meta.url)), 'utf8');
 
 test('wizard opens only the public issue form and does not put site data in the URL', async () => {
