@@ -20,6 +20,36 @@ test('admin authorization is exact and cannot be granted by user metadata', () =
   assert.equal(isAdminUser(null), false);
 });
 
+test('TOTP QR validation accepts Supabase SVG and rejects active or external content', async () => {
+  const { safeTotpQrSvg } = await import('../admin/auth-policy.js');
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><path d="M0 0h1v1z"/></svg>';
+  assert.equal(safeTotpQrSvg(svg), svg);
+  assert.equal(safeTotpQrSvg('  <?xml version="1.0"?>\n' + svg), svg);
+  assert.equal(safeTotpQrSvg('<svg><script>alert(1)</script></svg>'), null);
+  assert.equal(safeTotpQrSvg('<svg><image href="https://evil.example/x"/></svg>'), null);
+  assert.equal(safeTotpQrSvg('<svg onload="alert(1)"></svg>'), null);
+  assert.equal(safeTotpQrSvg('data:image/svg+xml,<svg></svg>'), null);
+  assert.equal(safeTotpQrSvg('x'.repeat(100_001)), null);
+});
+
+test('TOTP retry removes only this app’s unverified factor and fails closed on cleanup errors', async () => {
+  const { clearStaleTotpEnrollments } = await import('../admin/auth-policy.js');
+  const removed = [];
+  const api = {
+    listFactors: async () => ({ data: { totp: [
+      { id: 'stale-1', status: 'unverified', friendly_name: 'Web-Kit Cockpit' },
+      { id: 'verified', status: 'verified', friendly_name: 'Web-Kit Cockpit' },
+      { id: 'other', status: 'unverified', friendly_name: 'Personal phone' },
+    ] }, error: null }),
+    unenroll: async ({ factorId }) => { removed.push(factorId); return { error: null }; },
+  };
+  assert.equal(await clearStaleTotpEnrollments(api, 'Web-Kit Cockpit'), 1);
+  assert.deepEqual(removed, ['stale-1']);
+  await assert.rejects(() => clearStaleTotpEnrollments({
+    listFactors: async () => ({ data: null, error: new Error('list failed') }),
+  }, 'Web-Kit Cockpit'), /list failed/);
+});
+
 test('personal admin requires verified TOTP and AAL2; all other auth states fail closed', () => {
   const admin = { id: 'admin' };
   assert.equal(authGateState({ user: null, admin: false }), 'login');

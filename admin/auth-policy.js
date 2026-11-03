@@ -10,3 +10,28 @@ export function authGateState({ user, admin, currentLevel, nextLevel, verifiedTo
   if (nextLevel === 'aal2') return 'challenge';
   return 'blocked';
 }
+
+
+export function safeTotpQrSvg(value) {
+  if (typeof value !== 'string' || value.length > 100_000) return null;
+  const svg = value.trim().replace(/^\uFEFF/, '').replace(/^<\?xml[^>]*>\s*/i, '');
+  if (!/^<svg(?:\s|>)/i.test(svg) || !/<\/svg>\s*$/i.test(svg)) return null;
+  if (/<!DOCTYPE|<!ENTITY|<script|<foreignObject|\bon[a-z]+\s*=|(?:href|src)\s*=|url\s*\(|style\s*=/i.test(svg)) return null;
+  return svg;
+}
+
+export async function clearStaleTotpEnrollments(mfaApi, friendlyName) {
+  const { data, error } = await mfaApi.listFactors();
+  if (error) throw error;
+  if (!Array.isArray(data?.totp)) throw new Error('Invalid MFA factors response');
+  const staleFactors = data.totp.filter(factor =>
+    factor.status === 'unverified' &&
+    factor.friendly_name === friendlyName &&
+    typeof factor.id === 'string'
+  );
+  for (const factor of staleFactors) {
+    const { error: unenrollError } = await mfaApi.unenroll({ factorId: factor.id });
+    if (unenrollError) throw unenrollError;
+  }
+  return staleFactors.length;
+}
