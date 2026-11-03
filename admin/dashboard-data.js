@@ -61,7 +61,7 @@ export async function loadProjectData(project, fetchImpl = fetch) {
     githubJson(`${base}/actions/runs?branch=main&per_page=100`, fetchImpl),
     githubJson(`${base}/commits/main`, fetchImpl),
   ]);
-  const result = { project, loadedAt: new Date().toISOString(), issues: null, workflow: null, mainSha: null, pages: null, error: null };
+  const result = { project, loadedAt: new Date().toISOString(), issues: null, workflow: null, mainSha: null, pages: null, runs: null, error: null };
   const errors = [];
   if (itemsResult.status === 'fulfilled') {
     try { result.issues = splitOpenItems(itemsResult.value); }
@@ -71,6 +71,7 @@ export async function loadProjectData(project, fetchImpl = fetch) {
     try {
       const runs = runsResult.value.workflow_runs;
       result.workflow = latestMainPush(runs);
+      result.runs = runs;
       result.pages = runs.find(run => run.name === 'pages build and deployment' && run.head_branch === 'main') ?? null;
     }
     catch (error) { errors.push(error); }
@@ -115,4 +116,16 @@ export function currentWorkflowState(run, mainSha) {
   const state = workflowState(run);
   if (state !== 'success') return state;
   return deploymentState(null, mainSha, run?.head_sha) === 'current' ? 'success' : 'unknown';
+}
+
+// Only report the latest attempt of each workflow for the exact main commit.
+export function mainWorkflowAttention(runs, mainSha) {
+  if (!Array.isArray(runs) || !/^[0-9a-f]{40}$/i.test(mainSha || '')) return null;
+  const latest = new Map();
+  for (const run of runs) {
+    if (run.head_branch !== 'main' || run.head_sha !== mainSha || !run.name) continue;
+    if (!latest.has(run.name)) latest.set(run.name, run);
+  }
+  if (!latest.size) return null;
+  return [...latest.values()].map(run => ({ name: run.name, state: workflowState(run) })).filter(run => run.state !== 'success');
 }

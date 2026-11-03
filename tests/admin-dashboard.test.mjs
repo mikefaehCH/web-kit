@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState } from '../admin/dashboard-data.js';
+import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention } from '../admin/dashboard-data.js';
 import { authGateState, isAdminUser } from '../admin/auth-policy.js';
 
 function response(body, status = 200) {
@@ -181,4 +181,12 @@ test('an old or unverifiable successful CI run is not green', () => {
   assert.equal(currentWorkflowState(run,a),'success');
   assert.equal(currentWorkflowState(run,b),'unknown');
   assert.equal(currentWorkflowState(run,null),'unknown');
+});
+
+test('latest main workflows expose failure and do not hide unknown', () => {
+  const sha = 'a'.repeat(40), old = 'b'.repeat(40);
+  const run = (name, conclusion, head_sha=sha) => ({name,head_sha,head_branch:'main',status:'completed',conclusion});
+  assert.deepEqual(mainWorkflowAttention([run('CI','failure'),run('CI','success'),run('Build','success'),run('Other','failure',old)],sha),[{name:'CI',state:'failure'}]);
+  assert.equal(mainWorkflowAttention([],sha),null);
+  assert.deepEqual(mainWorkflowAttention([run('CI','neutral')],sha),[{name:'CI',state:'unknown'}]);
 });

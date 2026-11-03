@@ -1,4 +1,4 @@
-import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState } from './dashboard-data.js';
+import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention } from './dashboard-data.js';
 
 const grid = document.querySelector('#project-grid');
 const updated = document.querySelector('#dashboard-updated');
@@ -34,7 +34,8 @@ function cardFor(data, deployment) {
 
   const state = currentWorkflowState(workflow, data.mainSha);
   const deployed = project.repo === 'web-kit' ? deploymentState(null, data.mainSha, deployment?.commit) : deploymentState(data.pages, data.mainSha, data.pages?.head_sha);
-  const needsAttention = state !== 'success' || deployed !== 'current' || !issues || Boolean(error) || Boolean(issues?.issues || issues?.pullRequests);
+  const workflowProblems = mainWorkflowAttention(data.runs, data.mainSha);
+  const needsAttention = state !== 'success' || workflowProblems === null || workflowProblems.length > 0 || deployed !== 'current' || !issues || Boolean(error) || Boolean(issues?.issues || issues?.pullRequests);
   card.dataset.failed = String(state === 'failure');
   card.dataset.attention = String(needsAttention);
   const badge = document.createElement('p');
@@ -123,6 +124,9 @@ async function refresh() {
       if (state === 'running') problems.push(`${item.project.name}: Main-Workflow läuft`);
       if (state === 'unknown') problems.push(`${item.project.name}: Status des letzten Main-Workflows unbekannt`);
       if (item.issues && (item.issues.issues || item.issues.pullRequests)) problems.push(`${item.project.name}: ${item.issues.pullRequests} offene PR(s), ${item.issues.issues} offene Issues`);
+      const workflowProblems = mainWorkflowAttention(item.runs, item.mainSha);
+      if (workflowProblems === null) problems.push(`${item.project.name}: einzelne CI-Läufe unbekannt`);
+      else for (const run of workflowProblems) problems.push(`${item.project.name}: ${run.name} – ${statusLabel(run.state)}`);
       const deployed = item.project.repo === 'web-kit'
         ? deploymentState(null, item.mainSha, deployment?.commit)
         : deploymentState(item.pages, item.mainSha, item.pages?.head_sha);
