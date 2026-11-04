@@ -46,3 +46,9 @@ test('Statusklärung erfordert ausdrückliche Bestätigung',async()=>{
   for (const confirmed of [false,null,undefined,'true']) await assert.rejects(store.resolve({...args,itemId:'i',confirmed}));
   assert.equal(calls,0);assert.equal(await store.resolve({...args,itemId:'i',confirmed:true}),true);assert.equal(calls,1);
 });
+
+test('Auftragsliste enthält nur erlaubte Metadaten',async()=>{
+  const store=createBatchStore(async()=>({data:{batches:[{batch_id:'batch',created_at:'2026-01-01',message_hash:'hidden'}]}}));
+  assert.deepEqual(await store.list(args),[{id:'batch',createdAt:'2026-01-01'}]);
+  await assert.rejects(createBatchStore(async()=>({data:{batches:Array(21).fill({batch_id:'b',created_at:'now'})}})).list(args));
+});
