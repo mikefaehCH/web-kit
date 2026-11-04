@@ -54,7 +54,7 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
   }));
   async function loadHistory(snap) {
     const data=await call('batch_list',{before:historyCursor});if(!visible(snap))return;if(!Array.isArray(data.batches))throw Error('list');jobs.replaceChildren();
-    for(const job of data.batches){const li=document.createElement('li'), button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='Auftrag '+job.createdAt;button.addEventListener('click',()=>work(async n=>{activeBatch=job.id;resetReview();await inspect(job.id,n);if(visible(n))status.textContent='Für eine Fortsetzung den ursprünglichen Nachrichtentext erneut eingeben und prüfen.';}));li.append(button);jobs.append(li);}
+    for(const job of data.batches){const li=document.createElement('li'), button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='Auftrag '+job.createdAt;button.addEventListener('click',()=>work(async n=>{activeBatch=null;resetReview();results.replaceChildren();await inspect(job.id,n);if(visible(n)){activeBatch=job.id;status.textContent='Für eine Fortsetzung den ursprünglichen Nachrichtentext erneut eingeben und prüfen.';}}));li.append(button);jobs.append(li);}
     historyCursor=data.batches.length===20?data.batches[data.batches.length-1].id:null;
     if(historyCursor){const more=document.createElement('button');more.type='button';more.textContent='Ältere Aufträge';more.addEventListener('click',()=>work(loadHistory));jobs.append(more);}
     status.textContent=data.batches.length+' Aufträge werden angezeigt.';
