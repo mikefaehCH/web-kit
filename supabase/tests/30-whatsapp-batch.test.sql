@@ -70,7 +70,7 @@ begin
  first_page:=public.web_kit_whatsapp_batch_list(a); assert jsonb_array_length(first_page->'batches')=20;
  cursor_id:=(first_page->'batches'->19->>'batch_id')::uuid;
  second_page:=public.web_kit_whatsapp_batch_list(a,cursor_id); assert jsonb_array_length(second_page->'batches')=1;
- assert not (first_page->'batches' @> second_page->'batches');
+ assert not ((first_page->'batches') @> (second_page->'batches'));
  begin perform public.web_kit_whatsapp_batch_list('bbbbbbbb-1111-4111-8111-111111111111',cursor_id); raise exception 'cross owner cursor accepted'; exception when invalid_parameter_value then null; end;
 end $$;
 -- Separate actor: quota permits 10 batch creations in one hour.
