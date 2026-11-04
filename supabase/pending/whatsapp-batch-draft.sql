@@ -205,34 +205,42 @@ begin
   return result;
 end $$;
 
-create function public.web_kit_whatsapp_project_set_recipient(p_actor uuid,p_project text,p_chat text,p_selected boolean)
+
+create function public.web_kit_whatsapp_project_set_recipients(p_actor uuid,p_project text,p_chats jsonb,p_selected boolean)
 returns boolean language plpgsql security definer set search_path = '' as $$
+declare n integer; new_count integer;
 begin
   if coalesce(auth.role(),'') <> 'service_role' or not exists (
     select 1 from auth.users u where u.id=p_actor and u.deleted_at is null
       and (u.banned_until is null or u.banned_until <= now())
       and u.raw_app_meta_data->>'web_kit_admin'='true'
   ) then raise exception 'forbidden' using errcode='42501'; end if;
-  if p_project is null or p_project !~ '^[a-z0-9][a-z0-9-]{0,47}$' or p_chat is null
-    or p_chat !~ '^([0-9]{6,20}@c[.]us|[0-9]{6,24}(-[0-9]{1,20})?@g[.]us)$'
-    or p_selected is null then return false; end if;
+  if p_project is null or p_project !~ '^[a-z0-9][a-z0-9-]{0,47}$'
+     or p_selected is null or jsonb_typeof(p_chats) is distinct from 'array' then return false; end if;
+  n:=jsonb_array_length(p_chats);
+  if n < 1 or n > 1000 then return false; end if;
+  if exists(select 1 from jsonb_array_elements(p_chats) x where jsonb_typeof(x)<>'string'
+       or (x #>> '{}') !~ '^([0-9]{6,20}@c[.]us|[0-9]{6,24}(-[0-9]{1,20})?@g[.]us)$')
+       or (select count(distinct value) from jsonb_array_elements_text(p_chats)) <> n then return false; end if;
   perform pg_advisory_xact_lock(hashtextextended('web_kit_wa_projects:' || p_actor::text,0));
   if p_selected then
-    if (select count(*) from public.web_kit_wa_recipient_projects where actor_id=p_actor) >= 1000
-       and not exists(select 1 from public.web_kit_wa_recipient_projects where actor_id=p_actor and project_slug=p_project and chat_id=p_chat)
-       then return false; end if;
-    insert into public.web_kit_wa_recipient_projects(actor_id,project_slug,chat_id) values(p_actor,p_project,p_chat)
+    select count(*) into new_count from jsonb_array_elements_text(p_chats) v(chat)
+      where not exists(select 1 from public.web_kit_wa_recipient_projects p
+        where p.actor_id=p_actor and p.project_slug=p_project and p.chat_id=v.chat);
+    if (select count(*) from public.web_kit_wa_recipient_projects where actor_id=p_actor)+new_count > 1000 then return false; end if;
+    insert into public.web_kit_wa_recipient_projects(actor_id,project_slug,chat_id)
+      select p_actor,p_project,chat from jsonb_array_elements_text(p_chats) v(chat)
       on conflict do nothing;
   else
-    delete from public.web_kit_wa_recipient_projects where actor_id=p_actor and project_slug=p_project and chat_id=p_chat;
+    delete from public.web_kit_wa_recipient_projects
+      where actor_id=p_actor and project_slug=p_project and chat_id in (select value from jsonb_array_elements_text(p_chats));
   end if;
   return true;
 end $$;
 revoke all on function public.web_kit_whatsapp_project_recipients(uuid,text) from public, anon, authenticated;
-revoke all on function public.web_kit_whatsapp_project_set_recipient(uuid,text,text,boolean) from public, anon, authenticated;
+revoke all on function public.web_kit_whatsapp_project_set_recipients(uuid,text,jsonb,boolean) from public, anon, authenticated;
 grant execute on function public.web_kit_whatsapp_project_recipients(uuid,text) to service_role;
-grant execute on function public.web_kit_whatsapp_project_set_recipient(uuid,text,text,boolean) to service_role;
-
+grant execute on function public.web_kit_whatsapp_project_set_recipients(uuid,text,jsonb,boolean) to service_role;
 
 create function public.web_kit_whatsapp_projects(p_actor uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
