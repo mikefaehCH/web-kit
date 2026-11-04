@@ -56,6 +56,14 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
     status.textContent=data.incomplete?'Einige Kontakte konnten nicht geladen werden.':'Kontakte und Gruppen geladen.';
   }));
 
+
+  $('batch-projects-load').addEventListener('click',()=>work(async snap=>{
+    const data=await call('batch_projects_list');if(!visible(snap))return;
+    if(!Array.isArray(data.projects))throw Error('invalid projects');
+    const options=$('batch-project-options');options.replaceChildren();
+    for(const project of data.projects){if(typeof project!=='string')throw Error('invalid project');const option=document.createElement('option');option.value=project;options.append(option);}
+    status.textContent=data.projects.length+' Projekte geladen.';
+  }));
   function projectKey() {
     const value=$('batch-project').value.trim().toLowerCase();
     if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(value)) throw Error('invalid project');
@@ -109,7 +117,7 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
     status.textContent=result.stopped?'Versand angehalten. Bitte Status pro Empfänger prüfen.':'Versandlauf verarbeitet. Annahme ist keine Zustellbestätigung.';
   }));
   $('batch-cancel').addEventListener('click',resetReview);
-  function clearSession() { epoch++; selected.clear(); activeBatch=null; historyCursor=null; contactRows=[]; search.value=''; $('batch-project').value=''; resetReview(); message.value=''; preview.textContent=''; $('batch-preview-recipients').replaceChildren(); list.replaceChildren(); jobs.replaceChildren(); results.replaceChildren(); status.textContent=''; }
+  function clearSession() { epoch++; selected.clear(); activeBatch=null; historyCursor=null; contactRows=[]; search.value=''; $('batch-project').value=''; $('batch-project-options').replaceChildren(); resetReview(); message.value=''; preview.textContent=''; $('batch-preview-recipients').replaceChildren(); list.replaceChildren(); jobs.replaceChildren(); results.replaceChildren(); status.textContent=''; }
   $('logout').addEventListener('click',clearSession);
   window.addEventListener('web-kit-admin-authenticated',clearSession);
 }
