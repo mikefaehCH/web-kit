@@ -13,6 +13,7 @@ const files = [
   'whatsapp.css',
   'whatsapp.html',
   'whatsapp.js',
+  'batch-ui.js',
   'vendor/supabase.js',
   'vendor/LICENSES.txt',
 ];
