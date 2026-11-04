@@ -2,7 +2,8 @@
 if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
   const $ = id => document.getElementById(id);
   const ui = $('batch-ui'), status = $('batch-ui-status'), list = $('batch-contacts'), jobs = $('batch-jobs'), results = $('batch-results');
-  const message = $('batch-message'), preview = $('batch-preview'), selected = new Map();
+  const message = $('batch-message'), preview = $('batch-preview'), selected = new Map(), search = $('batch-contacts-search');
+  let contactRows = [];
   let epoch = 0, busy = false, activeBatch = null, reviewed = null, historyCursor = null;
   ui.hidden = false;
   $('batch-unavailable').hidden = true;
@@ -40,15 +41,18 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
       }
     }
   }
+  function filterContacts() { const query=search.value.trim().toLocaleLowerCase('de-CH'); for(const row of contactRows) row.element.hidden=!row.text.includes(query); }
+  search.addEventListener('input',filterContacts);
   $('batch-load-contacts').addEventListener('click',()=>work(async snap=>{
     const data=await call('list_contacts'); if(!visible(snap))return;
-    if(!Array.isArray(data.contacts))throw Error('contacts'); list.replaceChildren(); selected.clear(); resetReview();
+    if(!Array.isArray(data.contacts))throw Error('contacts'); list.replaceChildren(); selected.clear(); contactRows=[]; activeBatch=null; resetReview();
     for(const contact of data.contacts){
       if(!contact || typeof contact.id!=='string' || typeof contact.name!=='string')continue;
       const li=document.createElement('li'), label=document.createElement('label'), checkbox=document.createElement('input');
       checkbox.type='checkbox'; checkbox.value=contact.id; checkbox.addEventListener('change',()=>{if(checkbox.checked)selected.set(contact.id,contact.name||contact.id);else selected.delete(contact.id);activeBatch=null;resetReview();});
-      label.append(checkbox,document.createTextNode(' '+(contact.name||contact.id)+' · '+contact.id)); li.append(label); list.append(li);
+      label.append(checkbox,document.createTextNode(' '+(contact.name||contact.id)+' · '+contact.id)); li.append(label); list.append(li); contactRows.push({element:li,text:((contact.name||'')+' '+contact.id).toLocaleLowerCase('de-CH')});
     }
+    filterContacts();
     status.textContent=data.incomplete?'Einige Kontakte konnten nicht geladen werden.':'Kontakte und Gruppen geladen.';
   }));
   $('batch-load-jobs').addEventListener('click',()=>work(async snap=>{
@@ -80,7 +84,7 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
     status.textContent=result.stopped?'Versand angehalten. Bitte Status pro Empfänger prüfen.':'Versandlauf verarbeitet. Annahme ist keine Zustellbestätigung.';
   }));
   $('batch-cancel').addEventListener('click',resetReview);
-  function clearSession() { epoch++; selected.clear(); activeBatch=null; historyCursor=null; resetReview(); message.value=''; preview.textContent=''; $('batch-preview-recipients').replaceChildren(); list.replaceChildren(); jobs.replaceChildren(); results.replaceChildren(); status.textContent=''; }
+  function clearSession() { epoch++; selected.clear(); activeBatch=null; historyCursor=null; contactRows=[]; search.value=''; resetReview(); message.value=''; preview.textContent=''; $('batch-preview-recipients').replaceChildren(); list.replaceChildren(); jobs.replaceChildren(); results.replaceChildren(); status.textContent=''; }
   $('logout').addEventListener('click',clearSession);
   window.addEventListener('web-kit-admin-authenticated',clearSession);
 }
