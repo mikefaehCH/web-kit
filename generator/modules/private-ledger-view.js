@@ -16,30 +16,49 @@ export function mountPrivateLedger(root, { store, ledger, backup }) {
   const create = el('button','Reise erstellen'); create.type='submit';
   form.append(titleLabel,peopleLabel,create);
   root.replaceChildren(el('h2','Reisekassen'),status,form,tripSelect,display);
+  // Only one action at a time: no second write while a load or save is pending.
+  let busy = false, loadSeq = 0;
+  function setBusy(value) {
+    busy = value; root.setAttribute('aria-busy', value ? 'true' : 'false');
+    for (const control of root.querySelectorAll('button,input,select')) control.disabled = value;
+  }
   async function run(fn) {
-    status.textContent = '';
+    if (busy || disposed) return false;
+    status.textContent = ''; setBusy(true);
     try { await fn(); } catch (e) { if (!disposed) status.textContent = e.message || 'Aktion fehlgeschlagen'; }
+    finally { if (!disposed) setBusy(false); }
+    return true;
   }
   async function reload(selectedId) {
-    const trips = await store.listTrips(); if (disposed) return;
+    // A newer load or sign-out makes every older response obsolete.
+    const seq = ++loadSeq;
+    const current = () => !disposed && seq === loadSeq;
+    const trips = await store.listTrips(); if (!current()) return;
+    const nextTrip = trips.find(t=>t.id===selectedId) || null;
+    let nextEntries = [], shownTrip = nextTrip;
+    if (nextTrip) {
+      const snapshot = await store.getTripSnapshot(nextTrip.id);
+      if (!current()) return;
+      if (snapshot.trip?.id !== nextTrip.id) throw new Error('Reisekasse konnte nicht eindeutig geladen werden.');
+      shownTrip = snapshot.trip; nextEntries = snapshot.entries;
+    }
     tripSelect.replaceChildren();
     const empty = el('option','Reise auswählen'); empty.value=''; tripSelect.append(empty);
     for (const t of trips) { const o=el('option',t.title); o.value=t.id; tripSelect.append(o); }
-    trip = trips.find(t=>t.id===selectedId) || null;
+    trip = shownTrip; entries = nextEntries;
     tripSelect.value=trip?.id || '';
-    if (trip) {
-      const snapshot = await store.getTripSnapshot(trip.id);
-      if (disposed) return;
-      trip = snapshot.trip; entries = snapshot.entries;
-    } else entries = [];
-    if (!disposed) render();
+    render();
   }
   form.addEventListener('submit', e => { e.preventDefault(); run(async () => {
     const names=people.value.split(',').map(x=>x.trim());
     const created=await store.createTrip(title.value,names); title.value='';people.value='';
     await reload(created.id);
   }); });
-  tripSelect.addEventListener('change', () => run(()=>reload(tripSelect.value)));
+  tripSelect.addEventListener('change', () => {
+    const wanted = tripSelect.value;
+    if (busy) { tripSelect.value = trip?.id || ''; return; }
+    run(()=>reload(wanted));
+  });
   function render() {
     display.replaceChildren(); if (!trip) return;
     display.append(el('h3',trip.title),el('p','Teilnehmer: '+trip.people.join(', ')));
@@ -98,5 +117,5 @@ export function mountPrivateLedger(root, { store, ledger, backup }) {
     }));
   }
   run(()=>reload());
-  return () => { disposed=true; root.replaceChildren(); };
+  return () => { disposed=true; loadSeq++; root.replaceChildren(); root.removeAttribute('aria-busy'); };
 }
