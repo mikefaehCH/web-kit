@@ -107,14 +107,38 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   const action = (body as { action?: unknown }).action;
   if (typeof action === "string" && action.startsWith("batch_")) {
     if (deps.env("WEB_KIT_WHATSAPP_BATCH_ENABLED") !== "true") return json({ error: "Batch sending unavailable" }, 503);
-    const { batchId, itemId, message, recipients, confirmed, before } = body as {
-      batchId?: unknown; itemId?: unknown; message?: unknown; recipients?: unknown; confirmed?: unknown; before?: unknown;
+    const { batchId, itemId, message, recipients, confirmed, before, project, selected } = body as {
+      batchId?: unknown; itemId?: unknown; message?: unknown; recipients?: unknown; confirmed?: unknown; before?: unknown; project?: unknown; selected?: unknown;
     };
     const store = createBatchStore(deps.serviceRpc);
     try {
       if (action === "batch_list") {
         if (before != null && (typeof before !== "string" || !UUID_V4.test(before))) return json({ error: "Invalid cursor" }, 400);
         return json({ batches: await store.list({ actorId: user.id, before: typeof before === "string" ? before.toLowerCase() : null }) });
+      }
+      if (action === "batch_projects_list") {
+        const result=await deps.serviceRpc("web_kit_whatsapp_projects",{p_actor:user.id});
+        if(result.error || !Array.isArray(result.data) || result.data.length>1000 ||
+           result.data.some(project=>typeof project!=="string" || !/^[a-z0-9][a-z0-9-]{0,47}$/.test(project)))
+          return json({error:"Projects unavailable"},503);
+        return json({projects:result.data});
+      }
+      if (action === "batch_project_list" || action === "batch_project_set") {
+        if (typeof project !== "string" || !/^[a-z0-9][a-z0-9-]{0,47}$/.test(project)) return json({ error: "Invalid project" }, 400);
+        if (action === "batch_project_list") {
+          const result=await deps.serviceRpc("web_kit_whatsapp_project_recipients",{p_actor:user.id,p_project:project});
+          if (result.error || !Array.isArray(result.data) || result.data.length>1000 ||
+              result.data.some(id=>typeof id!=="string" || !/^(?:[0-9]{6,20}@c[.]us|[0-9]{6,24}(?:-[0-9]{1,20})?@g[.]us)$/.test(id)))
+            return json({error:"Project recipients unavailable"},503);
+          return json({recipients:result.data});
+        }
+        if (!Array.isArray(recipients) || recipients.length<1 || recipients.length>1000 ||
+            recipients.some(id=>typeof id!=="string" || !/^(?:[0-9]{6,20}@c[.]us|[0-9]{6,24}(?:-[0-9]{1,20})?@g[.]us)$/.test(id)) ||
+            new Set(recipients).size!==recipients.length || typeof selected !== "boolean")
+          return json({error:"Invalid recipients"},400);
+        const result=await deps.serviceRpc("web_kit_whatsapp_project_set_recipients",{p_actor:user.id,p_project:project,p_chats:recipients,p_selected:selected});
+        if(result.error) return json({error:"Project recipients unavailable"},503);
+        return result.data===true ? json({ok:true}) : json({error:"Project recipient not updated"},409);
       }
       if (typeof batchId !== "string" || !UUID_V4.test(batchId)) return json({ error: "Invalid batch" }, 400);
       const batch = batchId.toLowerCase();

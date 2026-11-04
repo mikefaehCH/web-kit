@@ -98,4 +98,29 @@ begin
   for n in 1..9 loop assert public.web_kit_whatsapp_claim(a,gen_random_uuid(),repeat('f',64)); end loop;
   assert not public.web_kit_whatsapp_claim(a,gen_random_uuid(),repeat('f',64));
 end $$;
+
+-- Project assignments are owner scoped and do not expose tables to clients.
+do $$ declare a uuid:='aaaaaaaa-1111-4111-8111-111111111111'; b uuid:='bbbbbbbb-1111-4111-8111-111111111111'; r jsonb;
+begin
+  assert not has_table_privilege('authenticated','public.web_kit_wa_recipient_projects','select');
+  assert not has_function_privilege('authenticated','public.web_kit_whatsapp_project_set_recipients(uuid,text,jsonb,boolean)','execute');
+  assert not public.web_kit_whatsapp_project_set_recipients(a,'camino','["41790000009@c.us","invalid"]'::jsonb,true);
+  assert jsonb_array_length(public.web_kit_whatsapp_project_recipients(a,'camino'))=0;
+  assert not public.web_kit_whatsapp_project_set_recipients(a,'camino','["41790000009@c.us","41790000009@c.us"]'::jsonb,true);
+  assert public.web_kit_whatsapp_project_set_recipients(a,'camino','["41790000000@c.us"]'::jsonb,true);
+  assert public.web_kit_whatsapp_project_set_recipients(a,'sommer','["41790000000@c.us"]'::jsonb,true);
+  assert public.web_kit_whatsapp_project_set_recipients(a,'camino','["41790000000@c.us"]'::jsonb,true);
+  assert public.web_kit_whatsapp_projects(a) = '["camino","sommer"]'::jsonb;
+  assert public.web_kit_whatsapp_projects(b) = '[]'::jsonb;
+  assert not has_function_privilege('authenticated','public.web_kit_whatsapp_projects(uuid)','execute');
+  r:=public.web_kit_whatsapp_project_recipients(a,'camino');
+  assert jsonb_array_length(r)=1;
+  assert jsonb_array_length(public.web_kit_whatsapp_project_recipients(b,'camino'))=0;
+  assert not public.web_kit_whatsapp_project_set_recipients(a,'invalid slug','["41790000000@c.us"]'::jsonb,true);
+  assert not public.web_kit_whatsapp_project_set_recipients(a,'camino','["invalid"]'::jsonb,true);
+  assert public.web_kit_whatsapp_project_set_recipients(a,'camino','["41790000000@c.us"]'::jsonb,false);
+  assert jsonb_array_length(public.web_kit_whatsapp_project_recipients(a,'camino'))=0;
+  assert jsonb_array_length(public.web_kit_whatsapp_project_recipients(a,'sommer'))=1;
+end $$;
+
 reset role;
