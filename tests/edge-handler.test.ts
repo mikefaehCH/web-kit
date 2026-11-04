@@ -348,3 +348,34 @@ test("Batchliste verwendet nur den verifizierten Eigentümer und verrät keine �
   assert.equal(res.status,200);assert.deepEqual(await res.json(),{batches:[{id:"b",createdAt:"date"}]});
   assert.deepEqual(t.rpc[0].args,{p_actor:ADMIN.id});assert.equal(t.fetches.length,0);
 });
+
+test("Unterbrochener Batch wird nach bestätigter Prüfung ohne Doppelversand fortgesetzt",async()=>{
+  const batchId="aaaaaaaa-1111-4111-8111-111111111111";
+  const ids=["bbbbbbbb-1111-4111-8111-111111111111","cccccccc-1111-4111-8111-111111111111"];
+  const rows=ids.map((id,index)=>({id,chat:["41790000000@c.us","41790000001@c.us"][index],key:"key"+index,status:"queued"}));
+  let sent:string[]=[];let savedHash="";
+  const rpcImpl=async(fn:string,args:Record<string,unknown>)=>{
+    if(fn==="web_kit_whatsapp_batch_create"){savedHash=String(args.p_message_hash);return {data:true,error:null};}
+    if(fn==="web_kit_whatsapp_batch_claim"){
+      if(args.p_message_hash!==savedHash)return {data:null,error:true};
+      if(rows.some(x=>x.status==="unknown"||x.status==="pending"))return {data:{state:"blocked"},error:null};
+      const next=rows.find(x=>x.status==="queued");
+      if(!next)return {data:{state:"complete"},error:null}; next.status="pending";
+      return {data:{state:"claimed",item_id:next.id,request_key:next.key,chat_id:next.chat},error:null};
+    }
+    if(fn==="web_kit_whatsapp_batch_finish"){const item=rows.find(x=>x.id===args.p_item);if(!item)return {data:false,error:null};item.status=String(args.p_status);return {data:true,error:null};}
+    if(fn==="web_kit_whatsapp_batch_inspect")return {data:{items:rows.map(x=>({item_id:x.id,chat_id:x.chat,status:x.status,review_available:x.status==="unknown"}))},error:null};
+    if(fn==="web_kit_whatsapp_batch_resolve"){const item=rows.find(x=>x.id===args.p_item&&x.status==="unknown");if(!item||args.p_confirm!==true)return {data:false,error:null};item.status="reviewed";return {data:true,error:null};}
+    return {data:null,error:true};
+  };
+  let n=0;const t=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},rpcImpl});
+  t.deps.fetch=(async(_url:string,init:RequestInit)=>{const b=JSON.parse(String(init.body));sent.push(b.chatId);if(n++===0)throw Error("timeout");return new Response(JSON.stringify({idMessage:"ABC123"}),{status:200});}) as typeof fetch;
+  const call=(body:unknown)=>handle(req(body),t.deps);
+  assert.equal((await call({action:"batch_create",batchId,message:"Hallo",recipients:rows.map(x=>x.chat)})).status,201);
+  let res=await call({action:"batch_send",batchId,message:"Hallo"});assert.equal((await res.json()).reason,"unknown");assert.deepEqual(sent,["41790000000@c.us"]);
+  res=await call({action:"batch_send",batchId,message:"Hallo"});assert.equal((await res.json()).reason,"blocked");assert.equal(sent.length,1);
+  res=await call({action:"batch_inspect",batchId});let status=await res.json();assert.equal(status.items[0].status,"unknown");assert.equal(status.items[0].reviewAvailable,true);
+  assert.equal((await call({action:"batch_resolve",batchId,itemId:ids[0],confirmed:true})).status,200);
+  res=await call({action:"batch_send",batchId,message:"Hallo"});assert.equal((await res.json()).stopped,false);assert.deepEqual(sent,["41790000000@c.us","41790000001@c.us"]);
+  assert.deepEqual(rows.map(x=>x.status),["reviewed","accepted"]);
+});
