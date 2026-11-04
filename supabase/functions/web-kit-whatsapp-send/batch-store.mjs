@@ -13,8 +13,8 @@ export function createBatchStore(rpc) {
       const data = await invoke('web_kit_whatsapp_batch_inspect', { p_batch: batchId, p_actor: actorId });
       if (!data || !Array.isArray(data.items) || data.items.length > 10 ||
           data.items.some(item => !item || typeof item.item_id !== 'string' ||
-            typeof item.chat_id !== 'string' || !['queued','pending','accepted','failed','unknown','reviewed'].includes(item.status))) throw new Error('Invalid batch status');
-      return data.items.map(item => ({ id: item.item_id, chatId: item.chat_id, status: item.status }));
+            typeof item.chat_id !== 'string' || typeof item.review_available !== 'boolean' || !['queued','pending','accepted','failed','unknown','reviewed'].includes(item.status))) throw new Error('Invalid batch status');
+      return data.items.map(item => ({ id: item.item_id, chatId: item.chat_id, status: item.status, reviewAvailable: item.review_available }));
     },
     async resolve({ batchId, actorId, itemId, confirmed }) {
       if (confirmed !== true) throw new Error('Explicit confirmation required');
