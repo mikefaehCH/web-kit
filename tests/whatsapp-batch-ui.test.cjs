@@ -112,7 +112,7 @@ test('project assignments load and update without sending messages',async()=>{
   await el('batch-project-add').fire('click');
   await el('batch-project-remove').fire('click');
   const calls=t.actions.filter(a=>a.action==='batch_project_set');
-  assert.equal(calls.length,2);assert.equal(calls[0].project,'camino');assert.equal(calls[0].selected,true);assert.equal(calls[1].selected,false);
+  assert.equal(calls.length,2);assert.equal(calls[0].project,'camino');assert.equal(calls[0].selected,true);assert.equal(calls[1].selected,false);assert.deepEqual(calls[0].recipients,['41790000000@c.us']);
   assert.ok(!t.actions.some(a=>a.action==='batch_send'));
   el('logout').fire('click');assert.equal(el('batch-project').value,'');assert.equal(el('batch-project-options').children.length,0);
 });
