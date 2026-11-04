@@ -110,10 +110,11 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     const { batchId, itemId, message, recipients, confirmed } = body as {
       batchId?: unknown; itemId?: unknown; message?: unknown; recipients?: unknown; confirmed?: unknown;
     };
-    if (typeof batchId !== "string" || !UUID_V4.test(batchId)) return json({ error: "Invalid batch" }, 400);
-    const batch = batchId.toLowerCase();
     const store = createBatchStore(deps.serviceRpc);
     try {
+      if (action === "batch_list") return json({ batches: await store.list({ actorId: user.id }) });
+      if (typeof batchId !== "string" || !UUID_V4.test(batchId)) return json({ error: "Invalid batch" }, 400);
+      const batch = batchId.toLowerCase();
       if (action === "batch_create") {
         if (typeof message !== "string" || !message.trim() || message.length > MAX_LENGTH ||
           !Array.isArray(recipients) || recipients.length < 1 || recipients.length > 10 ||
