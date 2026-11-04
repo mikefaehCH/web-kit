@@ -107,6 +107,9 @@ begin
   assert public.web_kit_whatsapp_project_set_recipient(a,'camino','41790000000@c.us',true);
   assert public.web_kit_whatsapp_project_set_recipient(a,'sommer','41790000000@c.us',true);
   assert public.web_kit_whatsapp_project_set_recipient(a,'camino','41790000000@c.us',true);
+  assert public.web_kit_whatsapp_projects(a) = '["camino","sommer"]'::jsonb;
+  assert public.web_kit_whatsapp_projects(b) = '[]'::jsonb;
+  assert not has_function_privilege('authenticated','public.web_kit_whatsapp_projects(uuid)','execute');
   r:=public.web_kit_whatsapp_project_recipients(a,'camino');
   assert jsonb_array_length(r)=1;
   assert jsonb_array_length(public.web_kit_whatsapp_project_recipients(b,'camino'))=0;
