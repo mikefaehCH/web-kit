@@ -80,7 +80,9 @@
           <label for="batch-contacts-search">Kontakte und Gruppen suchen</label>
           <input type="search" id="batch-contacts-search" autocomplete="off" placeholder="Name oder Nummer">
           <label for="batch-project">Projektkennung</label>
-          <input id="batch-project" type="text" maxlength="48" pattern="[a-z0-9][a-z0-9-]{0,47}" placeholder="z. B. camino" autocomplete="off">
+          <input id="batch-project" list="batch-project-options" type="text" maxlength="48" pattern="[a-z0-9][a-z0-9-]{0,47}" placeholder="z. B. camino" autocomplete="off">
+          <datalist id="batch-project-options"></datalist>
+          <button id="batch-projects-load" type="button" class="secondary">Vorhandene Projekte laden</button>
           <div class="actions"><button id="batch-project-load" type="button" class="secondary">Projektzuordnung laden</button><button id="batch-project-add" type="button" class="secondary">Auswahl zuordnen</button><button id="batch-project-remove" type="button" class="secondary">Auswahl aus Projekt entfernen</button></div>
           <p class="hint">Die Zuordnung gilt nur hier; WhatsApp-Kontakte werden nicht verändert.</p>
           <ul id="batch-contacts"></ul>
