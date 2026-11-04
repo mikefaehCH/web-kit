@@ -107,8 +107,8 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   const action = (body as { action?: unknown }).action;
   if (typeof action === "string" && action.startsWith("batch_")) {
     if (deps.env("WEB_KIT_WHATSAPP_BATCH_ENABLED") !== "true") return json({ error: "Batch sending unavailable" }, 503);
-    const { batchId, itemId, message, recipients, confirmed, before, project, chatId, selected } = body as {
-      batchId?: unknown; itemId?: unknown; message?: unknown; recipients?: unknown; confirmed?: unknown; before?: unknown; project?: unknown; chatId?: unknown; selected?: unknown;
+    const { batchId, itemId, message, recipients, confirmed, before, project, selected } = body as {
+      batchId?: unknown; itemId?: unknown; message?: unknown; recipients?: unknown; confirmed?: unknown; before?: unknown; project?: unknown; selected?: unknown;
     };
     const store = createBatchStore(deps.serviceRpc);
     try {
@@ -132,9 +132,11 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
             return json({error:"Project recipients unavailable"},503);
           return json({recipients:result.data});
         }
-        if (typeof chatId !== "string" || !/^(?:[0-9]{6,20}@c[.]us|[0-9]{6,24}(?:-[0-9]{1,20})?@g[.]us)$/.test(chatId) || typeof selected !== "boolean")
-          return json({error:"Invalid recipient"},400);
-        const result=await deps.serviceRpc("web_kit_whatsapp_project_set_recipient",{p_actor:user.id,p_project:project,p_chat:chatId,p_selected:selected});
+        if (!Array.isArray(recipients) || recipients.length<1 || recipients.length>1000 ||
+            recipients.some(id=>typeof id!=="string" || !/^(?:[0-9]{6,20}@c[.]us|[0-9]{6,24}(?:-[0-9]{1,20})?@g[.]us)$/.test(id)) ||
+            new Set(recipients).size!==recipients.length || typeof selected !== "boolean")
+          return json({error:"Invalid recipients"},400);
+        const result=await deps.serviceRpc("web_kit_whatsapp_project_set_recipients",{p_actor:user.id,p_project:project,p_chats:recipients,p_selected:selected});
         if(result.error) return json({error:"Project recipients unavailable"},503);
         return result.data===true ? json({ok:true}) : json({error:"Project recipient not updated"},409);
       }
