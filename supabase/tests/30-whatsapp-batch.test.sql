@@ -98,4 +98,23 @@ begin
   for n in 1..9 loop assert public.web_kit_whatsapp_claim(a,gen_random_uuid(),repeat('f',64)); end loop;
   assert not public.web_kit_whatsapp_claim(a,gen_random_uuid(),repeat('f',64));
 end $$;
+
+-- Project assignments are owner scoped and do not expose tables to clients.
+do $$ declare a uuid:='aaaaaaaa-1111-4111-8111-111111111111'; b uuid:='bbbbbbbb-1111-4111-8111-111111111111'; r jsonb;
+begin
+  assert not has_table_privilege('authenticated','public.web_kit_wa_recipient_projects','select');
+  assert not has_function_privilege('authenticated','public.web_kit_whatsapp_project_set_recipient(uuid,text,text,boolean)','execute');
+  assert public.web_kit_whatsapp_project_set_recipient(a,'camino','41790000000@c.us',true);
+  assert public.web_kit_whatsapp_project_set_recipient(a,'sommer','41790000000@c.us',true);
+  assert public.web_kit_whatsapp_project_set_recipient(a,'camino','41790000000@c.us',true);
+  r:=public.web_kit_whatsapp_project_recipients(a,'camino');
+  assert jsonb_array_length(r)=1;
+  assert jsonb_array_length(public.web_kit_whatsapp_project_recipients(b,'camino'))=0;
+  assert not public.web_kit_whatsapp_project_set_recipient(a,'invalid slug','41790000000@c.us',true);
+  assert not public.web_kit_whatsapp_project_set_recipient(a,'camino','invalid',true);
+  assert public.web_kit_whatsapp_project_set_recipient(a,'camino','41790000000@c.us',false);
+  assert jsonb_array_length(public.web_kit_whatsapp_project_recipients(a,'camino'))=0;
+  assert jsonb_array_length(public.web_kit_whatsapp_project_recipients(a,'sommer'))=1;
+end $$;
+
 reset role;
