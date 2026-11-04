@@ -13,11 +13,13 @@ create table public.web_kit_wa_batch_items (
   request_key uuid not null unique,
   position integer not null check (position >= 0),
   chat_id text not null check (chat_id ~ '^([0-9]{6,20}@c\.us|[0-9]{6,24}(-[0-9]{1,20})?@g\.us)$'),
-  status text not null default 'queued' check (status in ('queued','pending','accepted','failed','unknown')),
+  status text not null default 'queued' check (status in ('queued','pending','accepted','failed','unknown','reviewed')),
   provider_id text,
+  reviewed_at timestamptz,
   unique(batch_id, position),
   unique(batch_id, chat_id),
   check ((status = 'accepted') = (provider_id is not null)),
+  check ((status = 'reviewed') = (reviewed_at is not null)),
   check (provider_id is null or provider_id ~ '^[A-Za-z0-9._:@-]{1,128}$')
 );
 alter table public.web_kit_wa_batches enable row level security;
@@ -62,6 +64,22 @@ begin
 end $$;
 revoke all on function public.web_kit_whatsapp_batch_inspect(uuid,uuid) from public, anon, authenticated;
 grant execute on function public.web_kit_whatsapp_batch_inspect(uuid,uuid) to service_role;
+
+-- A reviewed unknown is never requeued. This only unblocks the other recipients.
+-- The eventual authenticated API must require explicit, informed user confirmation.
+create function public.web_kit_whatsapp_batch_resolve(p_batch uuid,p_actor uuid,p_item uuid,p_confirm boolean)
+returns boolean language plpgsql security definer set search_path = '' as $$
+begin
+  if coalesce(auth.role(),'') <> 'service_role' then raise exception 'forbidden' using errcode='42501'; end if;
+  if not exists (select 1 from auth.users u where u.id=p_actor and u.deleted_at is null and (u.banned_until is null or u.banned_until <= now()) and u.raw_app_meta_data->>'web_kit_admin'='true') then raise exception 'forbidden' using errcode='42501'; end if;
+  perform 1 from public.web_kit_wa_batches b where b.id=p_batch and b.actor_id=p_actor for update;
+  if not found then raise exception 'forbidden' using errcode='42501'; end if;
+  if p_confirm is distinct from true then return false; end if;
+  update public.web_kit_wa_batch_items set status='reviewed', reviewed_at=now() where batch_id=p_batch and id=p_item and status='unknown';
+  return found;
+end $$;
+revoke all on function public.web_kit_whatsapp_batch_resolve(uuid,uuid,uuid,boolean) from public, anon, authenticated;
+grant execute on function public.web_kit_whatsapp_batch_resolve(uuid,uuid,uuid,boolean) to service_role;
 
 create function public.web_kit_whatsapp_batch_claim(p_batch uuid, p_actor uuid, p_message_hash text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
