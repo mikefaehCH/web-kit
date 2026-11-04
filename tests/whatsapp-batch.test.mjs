@@ -6,7 +6,7 @@ function memoryStore() {
   const items = ['a','b'].map(id => ({ id, requestKey: `key-${id}`, status: 'queued' }));
   return { items, async claimNext({actorId}) { if (actorId !== 'owner') throw Error('forbidden'); if (items.some(x => x.status === 'pending' || x.status === 'unknown')) return {blocked:true}; const item = items.find(x => x.status === 'queued'); if (!item) return null; item.status = 'pending'; return { ...item }; }, async finish({itemId, outcome}) { const item = items.find(x => x.id === itemId); if (item.status !== 'pending') return false; item.status = outcome.status; return true; } };
 }
-const input = store => ({ store, batchId:'batch', actorId:'owner' });
+const input = store => ({ store, batchId:'batch', actorId:'owner', messageHash:'a'.repeat(64) });
 test('two workers cannot dispatch the same batch concurrently', async () => {
   const store=memoryStore(), sent=[];
   const send=async x => { sent.push(x.id); await new Promise(r => setTimeout(r, 1)); return {status:'accepted'}; };
@@ -33,6 +33,6 @@ test('audit failure stops processing and leaves the claim pending', async () => 
 });
 test('wrong owner cannot trigger provider', async () => {
   const store=memoryStore(); let sent=false;
-  await assert.rejects(runBatch({store,batchId:'batch',actorId:'other',send:async()=>{sent=true;}}));
+  await assert.rejects(runBatch({store,batchId:'batch',actorId:'other',messageHash:'a'.repeat(64),send:async()=>{sent=true;}}));
   assert.equal(sent,false);
 });
