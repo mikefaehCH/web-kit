@@ -18,6 +18,7 @@ function setup(enabled, history=[], failInspect=false, contacts=[{id:'4179000000
   const fetch=async(_url,init)=>{const req=JSON.parse(init.body);actions.push(req);let data={};
     if(req.action==='batch_list')data={batches:req.before ? history.slice(20) : history.slice(0,20)};
     if(req.action==='list_contacts')data={contacts};
+    if(req.action==='batch_projects_list')data={projects:['camino']};
     if(req.action==='batch_project_list')data={recipients:['41790000000@c.us']};
     if(req.action==='batch_project_set')data={ok:true};
     if(req.action==='batch_create')data={ok:true};
@@ -102,6 +103,8 @@ test('search filters contacts while retaining selections for preview',async()=>{
 test('project assignments load and update without sending messages',async()=>{
   const t=setup(true),el=id=>t.document.getElementById(id);
   await el('batch-load-contacts').fire('click');
+  await el('batch-projects-load').fire('click');
+  assert.equal(el('batch-project-options').children[0].value,'camino');
   el('batch-project').value='Camino';
   await el('batch-project-load').fire('click');
   const check=el('batch-contacts').children[0].children[0].children[0];
@@ -111,5 +114,5 @@ test('project assignments load and update without sending messages',async()=>{
   const calls=t.actions.filter(a=>a.action==='batch_project_set');
   assert.equal(calls.length,2);assert.equal(calls[0].project,'camino');assert.equal(calls[0].selected,true);assert.equal(calls[1].selected,false);
   assert.ok(!t.actions.some(a=>a.action==='batch_send'));
-  el('logout').fire('click');assert.equal(el('batch-project').value,'');
+  el('logout').fire('click');assert.equal(el('batch-project').value,'');assert.equal(el('batch-project-options').children.length,0);
 });
