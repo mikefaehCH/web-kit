@@ -57,7 +57,10 @@ export function mountPrivateLedger(root, { store, ledger, backup }) {
   tripSelect.addEventListener('change', () => {
     const wanted = tripSelect.value;
     if (busy) { tripSelect.value = trip?.id || ''; return; }
-    run(()=>reload(wanted));
+    run(async () => {
+      try { await reload(wanted); }
+      catch (error) { if (!disposed) tripSelect.value = trip?.id || ''; throw error; }
+    });
   });
   function render() {
     display.replaceChildren(); if (!trip) return;
