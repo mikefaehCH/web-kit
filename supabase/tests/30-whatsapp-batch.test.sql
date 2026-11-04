@@ -65,14 +65,14 @@ begin
  r:=public.web_kit_whatsapp_batch_inspect(b,a); assert r->'items'->0->>'status'='reviewed';
  r:=public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64)); assert r->>'state'='claimed'; assert r->>'item_id'='aaaaaaaa-3333-4333-8333-333333333332';
 end $$;
-do $ declare a uuid:='eeeeeeee-1111-4111-8111-111111111111'; first_page jsonb; second_page jsonb; cursor_id uuid;
+do $$ declare a uuid:='eeeeeeee-1111-4111-8111-111111111111'; first_page jsonb; second_page jsonb; cursor_id uuid;
 begin
  first_page:=public.web_kit_whatsapp_batch_list(a); assert jsonb_array_length(first_page->'batches')=20;
  cursor_id:=(first_page->'batches'->19->>'batch_id')::uuid;
  second_page:=public.web_kit_whatsapp_batch_list(a,cursor_id); assert jsonb_array_length(second_page->'batches')=1;
  assert not (first_page->'batches' @> second_page->'batches');
  begin perform public.web_kit_whatsapp_batch_list('bbbbbbbb-1111-4111-8111-111111111111',cursor_id); raise exception 'cross owner cursor accepted'; exception when invalid_parameter_value then null; end;
-end $;
+end $$;
 -- Separate actor: quota permits 10 batch creations in one hour.
 do $$ declare actor uuid:='bbbbbbbb-1111-4111-8111-111111111111'; ok_count integer:=0;
 begin
