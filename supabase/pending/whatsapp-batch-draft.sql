@@ -44,7 +44,7 @@ end $$;
 revoke all on function public.web_kit_whatsapp_batch_create(uuid,uuid,text,jsonb) from public, anon, authenticated;
 grant execute on function public.web_kit_whatsapp_batch_create(uuid,uuid,text,jsonb) to service_role;
 
-create function public.web_kit_whatsapp_batch_claim(p_batch uuid, p_actor uuid)
+create function public.web_kit_whatsapp_batch_claim(p_batch uuid, p_actor uuid, p_message_hash text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare item public.web_kit_wa_batch_items%rowtype;
 begin
@@ -52,6 +52,7 @@ begin
   if not exists (select 1 from auth.users u where u.id=p_actor and u.deleted_at is null and (u.banned_until is null or u.banned_until <= now()) and u.raw_app_meta_data->>'web_kit_admin'='true') then raise exception 'forbidden' using errcode='42501'; end if;
   perform 1 from public.web_kit_wa_batches b where b.id=p_batch and b.actor_id=p_actor for update;
   if not found then raise exception 'forbidden' using errcode='42501'; end if;
+  if p_message_hash is null or not exists (select 1 from public.web_kit_wa_batches where id=p_batch and message_hash=p_message_hash) then raise exception 'message mismatch' using errcode='22023'; end if;
   if exists(select 1 from public.web_kit_wa_batch_items i where i.batch_id=p_batch and i.status in ('pending','unknown')) then return jsonb_build_object('state','blocked'); end if;
   select * into item from public.web_kit_wa_batch_items i where i.batch_id=p_batch and i.status='queued' order by i.position limit 1;
   if not found then return jsonb_build_object('state','complete'); end if;
@@ -72,8 +73,8 @@ begin
   update public.web_kit_wa_batch_items set status=p_status, provider_id=p_provider_id where id=p_item and batch_id=p_batch and request_key=p_key and status='pending';
   return found;
 end $$;
-revoke all on function public.web_kit_whatsapp_batch_claim(uuid,uuid) from public, anon, authenticated;
+revoke all on function public.web_kit_whatsapp_batch_claim(uuid,uuid,text) from public, anon, authenticated;
 revoke all on function public.web_kit_whatsapp_batch_finish(uuid,uuid,uuid,uuid,text,text) from public, anon, authenticated;
-grant execute on function public.web_kit_whatsapp_batch_claim(uuid,uuid) to service_role;
+grant execute on function public.web_kit_whatsapp_batch_claim(uuid,uuid,text) to service_role;
 grant execute on function public.web_kit_whatsapp_batch_finish(uuid,uuid,uuid,uuid,text,text) to service_role;
 commit;
