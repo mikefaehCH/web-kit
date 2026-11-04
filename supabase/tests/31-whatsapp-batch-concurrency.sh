@@ -3,7 +3,7 @@ set -euo pipefail
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 psql -X -q -v ON_ERROR_STOP=1 <<'SQL'
-insert into public.web_kit_wa_batches(id,actor_id) values ('aaaaaaaa-2222-4222-8222-222222222223','aaaaaaaa-1111-4111-8111-111111111111');
+insert into public.web_kit_wa_batches(id,actor_id,message_hash) values ('aaaaaaaa-2222-4222-8222-222222222223','aaaaaaaa-1111-4111-8111-111111111111',repeat('b',64));
 insert into public.web_kit_wa_batch_items(id,batch_id,request_key,position,chat_id) values
  ('aaaaaaaa-3333-4333-8333-333333333333','aaaaaaaa-2222-4222-8222-222222222223','aaaaaaaa-4444-4444-8444-444444444443',1,'41790000002@c.us'),
  ('aaaaaaaa-3333-4333-8333-333333333334','aaaaaaaa-2222-4222-8222-222222222223','aaaaaaaa-4444-4444-8444-444444444444',2,'41790000003@c.us');
