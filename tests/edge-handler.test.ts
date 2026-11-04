@@ -346,7 +346,7 @@ test("Batchliste verwendet nur den verifizierten Eigentümer und verrät keine �
   const t=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},rpcImpl:async()=>({data:{batches:[{batch_id:"b",created_at:"date",message_hash:"secret"}]},error:null})});
   const res=await handle(req({action:"batch_list",actorId:"other"}),t.deps);
   assert.equal(res.status,200);assert.deepEqual(await res.json(),{batches:[{id:"b",createdAt:"date"}]});
-  assert.deepEqual(t.rpc[0].args,{p_actor:ADMIN.id});assert.equal(t.fetches.length,0);
+  assert.deepEqual(t.rpc[0].args,{p_actor:ADMIN.id,p_before:null});assert.equal(t.fetches.length,0);
 });
 
 test("Unterbrochener Batch wird nach bestätigter Prüfung ohne Doppelversand fortgesetzt",async()=>{
