@@ -40,5 +40,11 @@ jobs:
             gh api --paginate --slurp "repos/$GH_REPO/pulls/$pr/reviews?per_page=100" > reviews.json
             jq -e '[flatten | .[] | select(.user.login != null and (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")) | {login: .user.login, state: .state}] | group_by(.login) | all(.[]; (last.state != "CHANGES_REQUESTED"))' reviews.json >/dev/null || continue
             gh api -X PUT "repos/$GH_REPO/pulls/$pr/merge" \
-              -f merge_method=squash -f sha="$RUN_SHA" >/dev/null
+              -f merge_method=squash -f sha="$RUN_SHA" > merge.json
+            jq -e '.merged == true and (.sha | type == "string" and test("^[0-9a-f]{40}$"))' merge.json >/dev/null
+
+            # GITHUB_TOKEN merges do not emit push-triggered CI runs. Start
+            # both main workflows explicitly; never treat PR checks as main CI.
+            gh workflow run quality.yml --ref main
+            gh workflow run whatsapp-check.yml --ref main
           done
