@@ -17,6 +17,7 @@ function setup(over: Partial<{
   claim: { data: unknown; error: unknown };
   finishResult: { data: unknown; error: unknown };
   provider: () => Promise<Response>;
+  rpcImpl: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
   env: Record<string, string | undefined>;
 }> = {}) {
   const rpc: Call[] = [];
@@ -28,6 +29,7 @@ function setup(over: Partial<{
     getUser: async () => (over.user === undefined ? ADMIN : over.user),
     serviceRpc: async (fn, args) => {
       rpc.push({ fn, args });
+      if (over.rpcImpl) return over.rpcImpl(fn, args);
       if (fn === "web_kit_whatsapp_claim") return over.claim ?? { data: true, error: null };
       return over.finishResult ?? { data: true, error: null };
     },
@@ -295,4 +297,85 @@ test("unfertige Batch-Erstellung wird vor Datenbank und Provider abgewiesen", as
   const res=await handle(req({action:"create_batch",batchId:"aaaaaaaa-1111-4111-8111-111111111111",message:"Hi",recipients:["41790000000@c.us"]}),t.deps);
   assert.equal(res.status,400);
   assert.equal(t.rpc.length+t.fetches.length,0);
+});
+
+test("Batch-API ist standardmässig deaktiviert und verlangt MFA", async () => {
+  const payload={action:"batch_inspect",batchId:"aaaaaaaa-1111-4111-8111-111111111111"};
+  const off=setup();assert.equal((await handle(req(payload),off.deps)).status,503);assert.equal(off.rpc.length+off.fetches.length,0);
+  const low=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},user:{...ADMIN,aal:"aal1"}});
+  assert.equal((await handle(req(payload),low.deps)).status,403);assert.equal(low.rpc.length+low.fetches.length,0);
+});
+test("Batch wird mit serverseitigem Hash erstellt ohne Providerkontakt",async()=>{
+  const t=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},rpcImpl:async()=>({data:true,error:null})});
+  const res=await handle(req({action:"batch_create",batchId:"aaaaaaaa-1111-4111-8111-111111111111",message:"  Hallo  ",recipients:["41790000000@c.us"]}),t.deps);
+  assert.equal(res.status,201);assert.equal(t.fetches.length,0);
+  assert.equal(t.rpc[0].fn,"web_kit_whatsapp_batch_create");assert.equal(t.rpc[0].args.p_actor,ADMIN.id);
+  const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("Hallo"));
+  assert.equal(t.rpc[0].args.p_message_hash,Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,"0")).join(""));
+});
+test("Batch-Versand sendet nur den beanspruchten Empfänger und protokolliert Annahme",async()=>{
+  let claims=0;const calls:string[]=[];
+  const t=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},rpcImpl:async(fn)=>{
+    calls.push(fn);
+    if(fn==="web_kit_whatsapp_batch_claim")return {data:claims++===0?{state:"claimed",item_id:"i",request_key:"k",chat_id:"41790000000@c.us"}:{state:"complete"},error:null};
+    if(fn==="web_kit_whatsapp_batch_finish")return {data:true,error:null};
+    return {data:null,error:true};
+  }});
+  const res=await handle(req({action:"batch_send",batchId:"aaaaaaaa-1111-4111-8111-111111111111",message:" Hallo "}),t.deps);
+  assert.equal(res.status,200); assert.equal(t.fetches.length,1);assert.deepEqual(t.fetches[0].body,{chatId:"41790000000@c.us",message:"Hallo"});
+  assert.equal(t.fetches[0].redirect,"error");assert.deepEqual(calls,["web_kit_whatsapp_batch_claim","web_kit_whatsapp_batch_finish","web_kit_whatsapp_batch_claim"]);
+  assert.equal(t.rpc[1].args.p_status,"accepted");
+});
+test("Provider-Timeout stoppt Batch mit unknown und ohne Wiederholung",async()=>{
+  let claims=0;
+  const t=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},provider:async()=>{throw new Error("timeout");},rpcImpl:async(fn)=>{
+    if(fn==="web_kit_whatsapp_batch_claim"){claims++;return {data:{state:"claimed",item_id:"i",request_key:"k",chat_id:"41790000000@c.us"},error:null};}
+    return {data:true,error:null};
+  }});
+  const res=await handle(req({action:"batch_send",batchId:"aaaaaaaa-1111-4111-8111-111111111111",message:"Hallo"}),t.deps);
+  const data=await res.json();assert.equal(data.reason,"unknown");assert.equal(claims,1);assert.equal(t.fetches.length,1);assert.equal(t.rpc[1].args.p_status,"unknown");
+});
+test("Auflösung benötigt explizite Bestätigung und ruft keinen Provider auf",async()=>{
+  const t=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},rpcImpl:async()=>({data:true,error:null})});
+  const base={action:"batch_resolve",batchId:"aaaaaaaa-1111-4111-8111-111111111111",itemId:"bbbbbbbb-1111-4111-8111-111111111111"};
+  assert.equal((await handle(req({...base,confirmed:false}),t.deps)).status,400);assert.equal(t.rpc.length,0);
+  assert.equal((await handle(req({...base,confirmed:true}),t.deps)).status,200);assert.equal(t.rpc[0].fn,"web_kit_whatsapp_batch_resolve");assert.equal(t.fetches.length,0);
+});
+
+test("Batchliste verwendet nur den verifizierten Eigentümer und verrät keine übrigen Daten", async () => {
+  const t=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},rpcImpl:async()=>({data:{batches:[{batch_id:"b",created_at:"date",message_hash:"secret"}]},error:null})});
+  const res=await handle(req({action:"batch_list",actorId:"other"}),t.deps);
+  assert.equal(res.status,200);assert.deepEqual(await res.json(),{batches:[{id:"b",createdAt:"date"}]});
+  assert.deepEqual(t.rpc[0].args,{p_actor:ADMIN.id});assert.equal(t.fetches.length,0);
+});
+
+test("Unterbrochener Batch wird nach bestätigter Prüfung ohne Doppelversand fortgesetzt",async()=>{
+  const batchId="aaaaaaaa-1111-4111-8111-111111111111";
+  const ids=["bbbbbbbb-1111-4111-8111-111111111111","cccccccc-1111-4111-8111-111111111111"];
+  const rows=ids.map((id,index)=>({id,chat:["41790000000@c.us","41790000001@c.us"][index],key:"key"+index,status:"queued"}));
+  let sent:string[]=[];let savedHash="";
+  const rpcImpl=async(fn:string,args:Record<string,unknown>)=>{
+    if(fn==="web_kit_whatsapp_batch_create"){savedHash=String(args.p_message_hash);return {data:true,error:null};}
+    if(fn==="web_kit_whatsapp_batch_claim"){
+      if(args.p_message_hash!==savedHash)return {data:null,error:true};
+      if(rows.some(x=>x.status==="unknown"||x.status==="pending"))return {data:{state:"blocked"},error:null};
+      const next=rows.find(x=>x.status==="queued");
+      if(!next)return {data:{state:"complete"},error:null}; next.status="pending";
+      return {data:{state:"claimed",item_id:next.id,request_key:next.key,chat_id:next.chat},error:null};
+    }
+    if(fn==="web_kit_whatsapp_batch_finish"){const item=rows.find(x=>x.id===args.p_item);if(!item)return {data:false,error:null};item.status=String(args.p_status);return {data:true,error:null};}
+    if(fn==="web_kit_whatsapp_batch_inspect")return {data:{items:rows.map(x=>({item_id:x.id,chat_id:x.chat,status:x.status,review_available:x.status==="unknown"}))},error:null};
+    if(fn==="web_kit_whatsapp_batch_resolve"){const item=rows.find(x=>x.id===args.p_item&&x.status==="unknown");if(!item||args.p_confirm!==true)return {data:false,error:null};item.status="reviewed";return {data:true,error:null};}
+    return {data:null,error:true};
+  };
+  let n=0;const t=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},rpcImpl});
+  t.deps.fetch=(async(_url:string,init:RequestInit)=>{const b=JSON.parse(String(init.body));sent.push(b.chatId);if(n++===0)throw Error("timeout");return new Response(JSON.stringify({idMessage:"ABC123"}),{status:200});}) as typeof fetch;
+  const call=(body:unknown)=>handle(req(body),t.deps);
+  assert.equal((await call({action:"batch_create",batchId,message:"Hallo",recipients:rows.map(x=>x.chat)})).status,201);
+  let res=await call({action:"batch_send",batchId,message:"Hallo"});assert.equal((await res.json()).reason,"unknown");assert.deepEqual(sent,["41790000000@c.us"]);
+  res=await call({action:"batch_send",batchId,message:"Hallo"});assert.equal((await res.json()).reason,"blocked");assert.equal(sent.length,1);
+  res=await call({action:"batch_inspect",batchId});let status=await res.json();assert.equal(status.items[0].status,"unknown");assert.equal(status.items[0].reviewAvailable,true);
+  assert.equal((await call({action:"batch_resolve",batchId,itemId:ids[0],confirmed:true})).status,200);
+  res=await call({action:"batch_send",batchId,message:"Hallo"});assert.equal((await res.json()).stopped,false);assert.deepEqual(sent,["41790000000@c.us","41790000001@c.us"]);
+  assert.deepEqual(rows.map(x=>x.status),["reviewed","accepted"]);
 });

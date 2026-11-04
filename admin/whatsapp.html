@@ -74,7 +74,23 @@
 
       <section id="communication" class="communication" aria-labelledby="communication-title" hidden>
         <p class="eyebrow">Manueller Versand</p><h1 id="communication-title">WhatsApp-Nachricht</h1>
-        <p role="status">Der WhatsApp-Versand ist vorübergehend nicht verfügbar. Die Absicherung wird ergänzt.</p>
+        <p id="batch-unavailable" role="status">Der WhatsApp-Versand ist vorübergehend nicht verfügbar. Die Absicherung wird ergänzt.</p>
+        <section id="batch-ui" hidden aria-label="WhatsApp-Versand">
+          <button id="batch-load-contacts" type="button" class="secondary">Kontakte und Gruppen laden</button>
+          <ul id="batch-contacts"></ul>
+          <label for="batch-message">Nachricht</label>
+          <textarea id="batch-message" rows="7" maxlength="4000"></textarea>
+          <button id="batch-review-button" type="button">Nachricht prüfen</button>
+          <section id="batch-review" hidden aria-labelledby="batch-review-title">
+            <h2 id="batch-review-title">Vor dem Versand prüfen</h2>
+            <ul id="batch-preview-recipients"></ul><pre id="batch-preview"></pre>
+            <div class="actions"><button id="batch-confirm" type="button">Versand bestätigen</button><button id="batch-cancel" type="button" class="secondary">Abbrechen</button></div>
+          </section>
+          <h2>Versandaufträge</h2>
+          <button id="batch-load-jobs" type="button" class="secondary">Letzte Aufträge laden</button>
+          <ul id="batch-jobs"></ul><ul id="batch-results"></ul>
+          <p id="batch-ui-status" role="status" aria-live="polite"></p>
+        </section>
         <details id="contacts-panel" hidden><summary>WhatsApp-Kontakte und Gruppen auswählen</summary>
           <p class="hint">Die Liste wird nur auf Anfrage geladen. Einzelne Kontakte erhalten die Nachricht separat.</p>
           <button type="button" id="load-contacts" class="secondary">Kontakte laden</button>
@@ -98,5 +114,6 @@
   <script type="module" src="./auth.js"></script>
   <script type="module" src="./dashboard.js"></script>
   <script type="module" src="./whatsapp.js"></script>
+  <script type="module" src="./batch-ui.js"></script>
 </body>
 </html>
