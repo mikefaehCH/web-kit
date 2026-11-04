@@ -410,3 +410,12 @@ test("Projektzuordnung prüft Eingaben, MFA und Eigentümer ohne Provideraufruf"
   assert.equal((await handle(req({action:"batch_project_set",project:"camino",chatId:"invalid",selected:true}),t.deps)).status,400);
   assert.equal(t.fetches.length,0);
 });
+
+test("Projektliste bleibt auf verifizierten Admin beschränkt",async()=>{
+ const t=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},rpcImpl:async()=>({data:["camino","sommer"],error:null})});
+ const res=await handle(req({action:"batch_projects_list",actorId:"other"}),t.deps);
+ assert.equal(res.status,200);assert.deepEqual(await res.json(),{projects:["camino","sommer"]});
+ assert.deepEqual(t.rpc[0].args,{p_actor:ADMIN.id});assert.equal(t.fetches.length,0);
+ const invalid=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},rpcImpl:async()=>({data:["<bad>"],error:null})});
+ assert.equal((await handle(req({action:"batch_projects_list"}),invalid.deps)).status,503);
+});
