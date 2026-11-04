@@ -26,6 +26,7 @@ export function createBatchStore(rpc) {
       if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid batch claim');
       if (data.state === 'complete') return null;
       if (data.state === 'blocked') return { blocked: true };
+      if (data.state === 'rate_limited') return { blocked: true, reason: 'rate_limited' };
       if (data.state !== 'claimed' || typeof data.item_id !== 'string' || typeof data.request_key !== 'string' || typeof data.chat_id !== 'string') throw new Error('Invalid batch claim');
       return { id: data.item_id, requestKey: data.request_key, chatId: data.chat_id };
     },
