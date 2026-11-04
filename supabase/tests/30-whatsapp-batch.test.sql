@@ -1,7 +1,9 @@
 \set ON_ERROR_STOP 1
 insert into auth.users(id,raw_app_meta_data) values
  ('aaaaaaaa-1111-4111-8111-111111111111','{"web_kit_admin":true}'),
- ('bbbbbbbb-1111-4111-8111-111111111111','{"web_kit_admin":true}');
+ ('bbbbbbbb-1111-4111-8111-111111111111','{"web_kit_admin":true}'),
+ ('dddddddd-1111-4111-8111-111111111111','{"web_kit_admin":true}'),
+ ('eeeeeeee-1111-4111-8111-111111111111','{"web_kit_admin":true}');
 insert into public.web_kit_wa_batches(id,actor_id,message_hash) values ('aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-1111-4111-8111-111111111111',repeat('a',64));
 insert into public.web_kit_wa_batches(id,actor_id,message_hash) values ('aaaaaaaa-2222-4222-8222-222222222224','aaaaaaaa-1111-4111-8111-111111111111',repeat('c',64));
 insert into public.web_kit_wa_batch_items(id,batch_id,request_key,position,chat_id,status,claimed_at) values ('aaaaaaaa-3333-4333-8333-333333333335','aaaaaaaa-2222-4222-8222-222222222224','aaaaaaaa-4444-4444-8444-444444444445',1,'41790000004@c.us','pending',now()-interval '6 minutes');
@@ -62,5 +64,22 @@ begin
     if public.web_kit_whatsapp_batch_create(gen_random_uuid(),actor,repeat('d',64),'["41790000000@c.us"]') then ok_count:=ok_count+1; end if;
   end loop;
   assert ok_count=10;
+end $$;
+-- Both entry points share the same ten-attempt quota.
+do $$ declare a uuid:='dddddddd-1111-4111-8111-111111111111'; b uuid:='dddddddd-2222-4222-8222-222222222222'; r jsonb;
+begin
+  assert public.web_kit_whatsapp_batch_create(b,a,repeat('a',64),'["41790000005@c.us","41790000006@c.us"]');
+  for n in 1..9 loop assert public.web_kit_whatsapp_claim(a,gen_random_uuid(),repeat('f',64)); end loop;
+  r:=public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64)); assert r->>'state'='claimed';
+  assert public.web_kit_whatsapp_batch_finish(b,a,(r->>'item_id')::uuid,(r->>'request_key')::uuid,'failed',null);
+  assert public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64))->>'state'='rate_limited';
+  assert not public.web_kit_whatsapp_claim(a,gen_random_uuid(),repeat('f',64));
+end $$;
+do $$ declare a uuid:='eeeeeeee-1111-4111-8111-111111111111'; b uuid:='eeeeeeee-2222-4222-8222-222222222222'; r jsonb;
+begin
+  assert public.web_kit_whatsapp_batch_create(b,a,repeat('a',64),'["41790000007@c.us"]');
+  r:=public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64)); assert r->>'state'='claimed';
+  for n in 1..9 loop assert public.web_kit_whatsapp_claim(a,gen_random_uuid(),repeat('f',64)); end loop;
+  assert not public.web_kit_whatsapp_claim(a,gen_random_uuid(),repeat('f',64));
 end $$;
 reset role;
