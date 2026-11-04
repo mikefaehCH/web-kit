@@ -18,6 +18,8 @@ function setup(enabled, history=[], failInspect=false, contacts=[{id:'4179000000
   const fetch=async(_url,init)=>{const req=JSON.parse(init.body);actions.push(req);let data={};
     if(req.action==='batch_list')data={batches:req.before ? history.slice(20) : history.slice(0,20)};
     if(req.action==='list_contacts')data={contacts};
+    if(req.action==='batch_project_list')data={recipients:['41790000000@c.us']};
+    if(req.action==='batch_project_set')data={ok:true};
     if(req.action==='batch_create')data={ok:true};
     if(req.action==='batch_send')data={stopped:false};
     if(req.action==='batch_inspect')data={items:[{id:'i',chatId:'41790000000@c.us',status:'accepted',reviewAvailable:false}]};
@@ -95,4 +97,19 @@ test('search filters contacts while retaining selections for preview',async()=>{
   el('batch-message').value='Hallo';el('batch-review-button').fire('click');
   assert.equal(el('batch-preview-recipients').children[0].textContent,'Anna · 41790000000@c.us');
   el('logout').fire('click');assert.equal(el('batch-contacts-search').value,'');
+});
+
+test('project assignments load and update without sending messages',async()=>{
+  const t=setup(true),el=id=>t.document.getElementById(id);
+  await el('batch-load-contacts').fire('click');
+  el('batch-project').value='Camino';
+  await el('batch-project-load').fire('click');
+  const check=el('batch-contacts').children[0].children[0].children[0];
+  assert.equal(check.checked,true);
+  await el('batch-project-add').fire('click');
+  await el('batch-project-remove').fire('click');
+  const calls=t.actions.filter(a=>a.action==='batch_project_set');
+  assert.equal(calls.length,2);assert.equal(calls[0].project,'camino');assert.equal(calls[0].selected,true);assert.equal(calls[1].selected,false);
+  assert.ok(!t.actions.some(a=>a.action==='batch_send'));
+  el('logout').fire('click');assert.equal(el('batch-project').value,'');
 });
