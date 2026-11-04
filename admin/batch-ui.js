@@ -65,6 +65,7 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
     const project=projectKey();
     if (!contactRows.length) { status.textContent='Bitte zuerst Kontakte und Gruppen laden.'; return; }
     const data=await call('batch_project_list',{project}); if(!visible(snap))return;
+    if($('batch-project').value.trim().toLowerCase()!==project){status.textContent='Projektkennung geändert. Bitte erneut laden.';return;}
     if(!Array.isArray(data.recipients))throw Error('invalid project recipients');
     const ids=new Set(data.recipients); selected.clear();activeBatch=null;resetReview();
     for(const row of contactRows){row.checkbox.checked=ids.has(row.id);if(row.checkbox.checked)selected.set(row.id,row.name);}
@@ -75,7 +76,7 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
     const project=projectKey(), ids=[...selected.keys()];
     if(!ids.length){status.textContent='Bitte zuerst Empfänger auswählen.';return;}
     for(const chatId of ids){if(!visible(snap))return;await call('batch_project_set',{project,chatId,selected:isSelected});}
-    if(visible(snap))status.textContent='Projektzuordnung aktualisiert. WhatsApp-Kontakte wurden nicht verändert.';
+    if(visible(snap))status.textContent='Projektzuordnung für '+project+' aktualisiert. WhatsApp-Kontakte wurden nicht verändert.';
   }
   $('batch-project-add').addEventListener('click',()=>work(snap=>updateProject(snap,true)));
   $('batch-project-remove').addEventListener('click',()=>work(snap=>updateProject(snap,false)));
