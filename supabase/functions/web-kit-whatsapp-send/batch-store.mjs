@@ -16,6 +16,11 @@ export function createBatchStore(rpc) {
             typeof item.chat_id !== 'string' || !['queued','pending','accepted','failed','unknown','reviewed'].includes(item.status))) throw new Error('Invalid batch status');
       return data.items.map(item => ({ id: item.item_id, chatId: item.chat_id, status: item.status }));
     },
+    async resolve({ batchId, actorId, itemId, confirmed }) {
+      if (confirmed !== true) throw new Error('Explicit confirmation required');
+      const data = await invoke('web_kit_whatsapp_batch_resolve', { p_batch: batchId, p_actor: actorId, p_item: itemId, p_confirm: true });
+      return data === true;
+    },
     async claimNext({ batchId, actorId, messageHash }) {
       const data = await invoke('web_kit_whatsapp_batch_claim', { p_batch: batchId, p_actor: actorId, p_message_hash: messageHash });
       if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid batch claim');
