@@ -379,3 +379,15 @@ test("Unterbrochener Batch wird nach bestätigter Prüfung ohne Doppelversand fo
   res=await call({action:"batch_send",batchId,message:"Hallo"});assert.equal((await res.json()).stopped,false);assert.deepEqual(sent,["41790000000@c.us","41790000001@c.us"]);
   assert.deepEqual(rows.map(x=>x.status),["reviewed","accepted"]);
 });
+
+test("Batchliste validiert Cursor und verwendet stets den angemeldeten Eigentümer",async()=>{
+  const t=setup({env:{WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"},rpcImpl:async()=>({data:{batches:[]},error:null})});
+  for(const before of ["ungueltig",42,{}, "aaaaaaaa-1111-1111-8111-111111111111"]){
+    assert.equal((await handle(req({action:"batch_list",before}),t.deps)).status,400);
+    assert.equal(t.rpc.length+t.fetches.length,0);
+  }
+  const before="AAAAAAAA-1111-4111-8111-111111111111";
+  assert.equal((await handle(req({action:"batch_list",before,actorId:"other"}),t.deps)).status,200);
+  assert.deepEqual(t.rpc[0].args,{p_actor:ADMIN.id,p_before:before.toLowerCase()});
+  assert.equal(t.fetches.length,0);
+});
