@@ -104,6 +104,9 @@ do $$ declare a uuid:='aaaaaaaa-1111-4111-8111-111111111111'; b uuid:='bbbbbbbb-
 begin
   assert not has_table_privilege('authenticated','public.web_kit_wa_recipient_projects','select');
   assert not has_function_privilege('authenticated','public.web_kit_whatsapp_project_set_recipients(uuid,text,jsonb,boolean)','execute');
+  assert not public.web_kit_whatsapp_project_set_recipients(a,'camino','["41790000009@c.us","invalid"]'::jsonb,true);
+  assert jsonb_array_length(public.web_kit_whatsapp_project_recipients(a,'camino'))=0;
+  assert not public.web_kit_whatsapp_project_set_recipients(a,'camino','["41790000009@c.us","41790000009@c.us"]'::jsonb,true);
   assert public.web_kit_whatsapp_project_set_recipients(a,'camino','["41790000000@c.us"]'::jsonb,true);
   assert public.web_kit_whatsapp_project_set_recipients(a,'sommer','["41790000000@c.us"]'::jsonb,true);
   assert public.web_kit_whatsapp_project_set_recipients(a,'camino','["41790000000@c.us"]'::jsonb,true);
