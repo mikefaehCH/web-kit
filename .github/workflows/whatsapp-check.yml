@@ -39,7 +39,7 @@ jobs:
       - name: Verhaltenstests (ohne Netzwerk, ohne echten Versand)
         run: node --experimental-strip-types --test tests/edge-handler.test.ts
       - name: Versandlauf mit simulierten Empfängern prüfen
-        run: node --test tests/whatsapp-batch.test.mjs
+        run: node --test tests/whatsapp-batch.test.mjs tests/whatsapp-batch-store.test.mjs
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
