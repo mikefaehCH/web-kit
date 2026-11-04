@@ -35,3 +35,8 @@ test('defekte oder unbekannte Statusantwort wird abgewiesen',async()=>{
     await assert.rejects(createBatchStore(async()=>({data:{items}})).inspect(args));
   }
 });
+
+test('manuell geprüfter unklarer Status bleibt sichtbar',async()=>{
+  const store=createBatchStore(async()=>({data:{items:[{item_id:'i',chat_id:'41790000000@c.us',status:'reviewed'}]}}));
+  assert.equal((await store.inspect(args))[0].status,'reviewed');
+});
