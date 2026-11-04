@@ -83,7 +83,7 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
   async function updateProject(snap, isSelected) {
     const project=projectKey(), ids=[...selected.keys()];
     if(!ids.length){status.textContent='Bitte zuerst Empfänger auswählen.';return;}
-    for(const chatId of ids){if(!visible(snap))return;await call('batch_project_set',{project,chatId,selected:isSelected});}
+    await call('batch_project_set',{project,recipients:ids,selected:isSelected});
     if(visible(snap))status.textContent='Projektzuordnung für '+project+' aktualisiert. WhatsApp-Kontakte wurden nicht verändert.';
   }
   $('batch-project-add').addEventListener('click',()=>work(snap=>updateProject(snap,true)));
