@@ -26,7 +26,7 @@ revoke all on public.web_kit_wa_batches, public.web_kit_wa_batch_items from publ
 
 create function public.web_kit_whatsapp_batch_create(p_batch uuid,p_actor uuid,p_message_hash text,p_chats jsonb)
 returns boolean language plpgsql security definer set search_path = '' as $$
-declare n integer;
+declare n integer; recent_count integer;
 begin
   if coalesce(auth.role(),'') <> 'service_role' then raise exception 'forbidden' using errcode='42501'; end if;
   if not exists (select 1 from auth.users u where u.id=p_actor and u.deleted_at is null and (u.banned_until is null or u.banned_until <= now()) and u.raw_app_meta_data->>'web_kit_admin'='true') then raise exception 'forbidden' using errcode='42501'; end if;
@@ -35,6 +35,10 @@ begin
   if n < 1 or n > 10 then return false; end if;
   if exists(select 1 from jsonb_array_elements(p_chats) x where jsonb_typeof(x) <> 'string' or (x #>> '{}') !~ '^([0-9]{6,20}@c[.]us|[0-9]{6,24}(-[0-9]{1,20})?@g[.]us)$') then return false; end if;
   if (select count(distinct x) from jsonb_array_elements_text(p_chats) x) <> n then return false; end if;
+  -- Serialises creations for an actor; retry IDs never create new rows.
+  perform pg_advisory_xact_lock(hashtextextended('web_kit_wa_batch_create:' || p_actor::text,0));
+  select count(*) into recent_count from public.web_kit_wa_batches where actor_id=p_actor and created_at > now()-interval '1 hour';
+  if recent_count >= 10 then return false; end if;
   insert into public.web_kit_wa_batches(id,actor_id,message_hash) values (p_batch,p_actor,p_message_hash) on conflict(id) do nothing;
   if not found then return false; end if;
   insert into public.web_kit_wa_batch_items(id,batch_id,request_key,position,chat_id)
