@@ -38,6 +38,8 @@ begin
  assert not (r->'items'->0 ? 'request_key');
  r:=public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64)); assert r->>'state'='claimed'; assert (r->>'item_id')::uuid=i;
  assert public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64))->>'state'='blocked';
+ r:=public.web_kit_whatsapp_batch_inspect(b,a); assert not (r->'items'->0->>'review_available')::boolean;
+ assert (public.web_kit_whatsapp_batch_inspect('aaaaaaaa-2222-4222-8222-222222222224',a)->'items'->0->>'review_available')::boolean;
  assert not public.web_kit_whatsapp_batch_resolve(b,a,i,true);
  assert public.web_kit_whatsapp_batch_resolve('aaaaaaaa-2222-4222-8222-222222222224',a,'aaaaaaaa-3333-4333-8333-333333333335',true);
  assert public.web_kit_whatsapp_batch_claim('aaaaaaaa-2222-4222-8222-222222222224',a,repeat('c',64))->>'state'='complete';
