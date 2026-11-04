@@ -9,8 +9,8 @@ export function createBatchStore(rpc) {
     return result.data;
   }
   return {
-    async list({ actorId }) {
-      const data = await invoke('web_kit_whatsapp_batch_list', { p_actor: actorId });
+    async list({ actorId, before = null }) {
+      const data = await invoke('web_kit_whatsapp_batch_list', { p_actor: actorId, p_before: before });
       if (!data || !Array.isArray(data.batches) || data.batches.length > 20 ||
           data.batches.some(b => !b || typeof b.batch_id !== 'string' || typeof b.created_at !== 'string')) throw new Error('Invalid batch list');
       return data.batches.map(b => ({ id: b.batch_id, createdAt: b.created_at }));
