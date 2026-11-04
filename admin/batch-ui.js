@@ -9,7 +9,9 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
   function item(parent, value) { const li = document.createElement('li'); li.textContent = value; parent.append(li); return li; }
   function resetReview() { reviewed = null; $('batch-review').hidden = true; }
   async function call(action, payload = {}) {
+    const requestEpoch = epoch;
     const token = await window.WEB_KIT_GET_ACCESS_TOKEN();
+    if (requestEpoch !== epoch) throw new Error('Sitzung wurde zurückgesetzt.');
     if (!token) throw new Error('Bitte erneut anmelden.');
     const response = await fetch(window.WEB_KIT_WHATSAPP_ENDPOINT, { method:'POST', cache:'no-store', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token, apikey:'sb_publishable_Qeom38G18vSgrrE5MxoXEw_LhJM1f6S' }, body:JSON.stringify({action,...payload}) });
     if (!response.ok) throw new Error('Die Aktion konnte nicht bestätigt werden. Prüfe den Status, bevor du es erneut versuchst.');
