@@ -11,6 +11,7 @@ insert into public.web_kit_wa_batch_items(id,batch_id,request_key,position,chat_
  ('aaaaaaaa-3333-4333-8333-333333333331','aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-4444-4444-8444-444444444441',1,'41790000000@c.us'),
  ('aaaaaaaa-3333-4333-8333-333333333332','aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-4444-4444-8444-444444444442',2,'41790000001@c.us');
 do $$ begin
+ assert not has_function_privilege('authenticated','public.web_kit_whatsapp_batch_list(uuid)','execute');
  assert not has_function_privilege('authenticated','public.web_kit_whatsapp_batch_resolve(uuid,uuid,uuid,boolean)','execute');
  assert not has_function_privilege('anon','public.web_kit_whatsapp_batch_inspect(uuid,uuid)','execute');
  assert not has_function_privilege('authenticated','public.web_kit_whatsapp_batch_inspect(uuid,uuid)','execute');
@@ -34,6 +35,11 @@ begin
  assert not public.web_kit_whatsapp_batch_create('cccccccc-2222-4222-8222-222222222222',a,repeat('a',64),'["41790000003@c.us"]');
  begin perform public.web_kit_whatsapp_batch_claim(b,a,repeat('b',64)); raise exception 'mismatched message accepted'; exception when invalid_parameter_value then null; end;
  begin perform public.web_kit_whatsapp_batch_inspect(b,'bbbbbbbb-1111-4111-8111-111111111111'); raise exception 'wrong owner could inspect'; exception when insufficient_privilege then null; end;
+ r:=public.web_kit_whatsapp_batch_list(a);
+ assert jsonb_array_length(r->'batches')=3;
+ assert not (r->'batches'->0 ? 'message_hash');
+ r:=public.web_kit_whatsapp_batch_list('bbbbbbbb-1111-4111-8111-111111111111');
+ assert jsonb_array_length(r->'batches')=0;
  r:=public.web_kit_whatsapp_batch_inspect(b,a);
  assert jsonb_array_length(r->'items')=2;
  assert r->'items'->0->>'status'='queued';
