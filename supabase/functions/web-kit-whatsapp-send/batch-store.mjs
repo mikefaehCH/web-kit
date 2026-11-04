@@ -9,6 +9,7 @@ export function createBatchStore(rpc) {
     return result.data;
   }
   return {
+    /** @param {{actorId: string, before?: string | null}} options */
     async list({ actorId, before = null }) {
       const data = await invoke('web_kit_whatsapp_batch_list', { p_actor: actorId, p_before: before });
       if (!data || !Array.isArray(data.batches) || data.batches.length > 20 ||
