@@ -4,7 +4,8 @@ begin;
 create table public.web_kit_wa_batches (
   id uuid primary key,
   actor_id uuid not null,
-  message_hash text not null check (message_hash ~ '^[0-9a-f]{64}
+  message_hash text not null check (message_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now()
 );
 create table public.web_kit_wa_batch_items (
   id uuid primary key,
