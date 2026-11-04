@@ -40,5 +40,13 @@ begin
  assert not public.web_kit_whatsapp_batch_finish(b,a,i,k,'accepted','FAKE');
  assert public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64))->>'state'='blocked';
  r:=public.web_kit_whatsapp_batch_inspect(b,a); assert r->'items'->0->>'status'='unknown';
-end $;
+end $$;
+-- Separate actor: quota permits 10 batch creations in one hour.
+do $$ declare actor uuid:='bbbbbbbb-1111-4111-8111-111111111111'; ok_count integer:=0;
+begin
+  for n in 1..11 loop
+    if public.web_kit_whatsapp_batch_create(gen_random_uuid(),actor,repeat('d',64),'["41790000000@c.us"]') then ok_count:=ok_count+1; end if;
+  end loop;
+  assert ok_count=10;
+end $$;
 reset role;
