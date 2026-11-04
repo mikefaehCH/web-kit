@@ -405,9 +405,9 @@ test("Projektzuordnung prüft Eingaben, MFA und Eigentümer ohne Provideraufruf"
   let res=await handle(req({action:"batch_project_list",project:"camino",actorId:"other"}),t.deps);
   assert.equal(res.status,200);assert.deepEqual(await res.json(),{recipients:["41790000000@c.us"]});
   assert.deepEqual(t.rpc[0].args,{p_actor:ADMIN.id,p_project:"camino"});
-  res=await handle(req({action:"batch_project_set",project:"camino",chatId:"41790000000@c.us",selected:true,actorId:"other"}),t.deps);
-  assert.equal(res.status,200);assert.deepEqual(t.rpc[1].args,{p_actor:ADMIN.id,p_project:"camino",p_chat:"41790000000@c.us",p_selected:true});
-  assert.equal((await handle(req({action:"batch_project_set",project:"camino",chatId:"invalid",selected:true}),t.deps)).status,400);
+  res=await handle(req({action:"batch_project_set",project:"camino",recipients:["41790000000@c.us"],selected:true,actorId:"other"}),t.deps);
+  assert.equal(res.status,200);assert.deepEqual(t.rpc[1].args,{p_actor:ADMIN.id,p_project:"camino",p_chats:["41790000000@c.us"],p_selected:true});
+  assert.equal((await handle(req({action:"batch_project_set",project:"camino",recipients:["invalid"],selected:true}),t.deps)).status,400);
   assert.equal(t.fetches.length,0);
 });
 
