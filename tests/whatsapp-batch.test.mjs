@@ -36,3 +36,9 @@ test('wrong owner cannot trigger provider', async () => {
   await assert.rejects(runBatch({store,batchId:'batch',actorId:'other',messageHash:'a'.repeat(64),send:async()=>{sent=true;}}));
   assert.equal(sent,false);
 });
+
+test('Rate-Limit stoppt den Lauf ohne Provideraufruf', async () => {
+  let sent=0; const store={claimNext:async()=>({blocked:true,reason:'rate_limited'}),finish:async()=>{throw Error('not called');}};
+  const result=await runBatch({...input(store),send:async()=>{sent++;}});
+  assert.equal(result.reason,'rate_limited'); assert.equal(sent,0);
+});
