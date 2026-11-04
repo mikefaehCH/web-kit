@@ -15,9 +15,11 @@ create table public.web_kit_wa_batch_items (
   chat_id text not null check (chat_id ~ '^([0-9]{6,20}@c\.us|[0-9]{6,24}(-[0-9]{1,20})?@g\.us)$'),
   status text not null default 'queued' check (status in ('queued','pending','accepted','failed','unknown','reviewed')),
   provider_id text,
+  claimed_at timestamptz,
   reviewed_at timestamptz,
   unique(batch_id, position),
   unique(batch_id, chat_id),
+  check ((status = 'queued') = (claimed_at is null)),
   check ((status = 'accepted') = (provider_id is not null)),
   check ((status = 'reviewed') = (reviewed_at is not null)),
   check (provider_id is null or provider_id ~ '^[A-Za-z0-9._:@-]{1,128}$')
@@ -65,7 +67,7 @@ end $$;
 revoke all on function public.web_kit_whatsapp_batch_inspect(uuid,uuid) from public, anon, authenticated;
 grant execute on function public.web_kit_whatsapp_batch_inspect(uuid,uuid) to service_role;
 
--- A reviewed unknown is never requeued. This only unblocks the other recipients.
+-- A reviewed unknown or stale pending item is never requeued. This only unblocks other recipients.
 -- The eventual authenticated API must require explicit, informed user confirmation.
 create function public.web_kit_whatsapp_batch_resolve(p_batch uuid,p_actor uuid,p_item uuid,p_confirm boolean)
 returns boolean language plpgsql security definer set search_path = '' as $$
@@ -75,7 +77,7 @@ begin
   perform 1 from public.web_kit_wa_batches b where b.id=p_batch and b.actor_id=p_actor for update;
   if not found then raise exception 'forbidden' using errcode='42501'; end if;
   if p_confirm is distinct from true then return false; end if;
-  update public.web_kit_wa_batch_items set status='reviewed', reviewed_at=now() where batch_id=p_batch and id=p_item and status='unknown';
+  update public.web_kit_wa_batch_items set status='reviewed', reviewed_at=now() where batch_id=p_batch and id=p_item and (status='unknown' or (status='pending' and claimed_at < now()-interval '5 minutes'));
   return found;
 end $$;
 revoke all on function public.web_kit_whatsapp_batch_resolve(uuid,uuid,uuid,boolean) from public, anon, authenticated;
@@ -93,7 +95,7 @@ begin
   if exists(select 1 from public.web_kit_wa_batch_items i where i.batch_id=p_batch and i.status in ('pending','unknown')) then return jsonb_build_object('state','blocked'); end if;
   select * into item from public.web_kit_wa_batch_items i where i.batch_id=p_batch and i.status='queued' order by i.position limit 1;
   if not found then return jsonb_build_object('state','complete'); end if;
-  update public.web_kit_wa_batch_items set status='pending' where id=item.id;
+  update public.web_kit_wa_batch_items set status='pending', claimed_at=now() where id=item.id;
   return jsonb_build_object('state','claimed','item_id',item.id,'request_key',item.request_key,'chat_id',item.chat_id);
 end $$;
 
