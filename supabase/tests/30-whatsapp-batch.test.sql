@@ -7,6 +7,8 @@ insert into public.web_kit_wa_batch_items(id,batch_id,request_key,position,chat_
  ('aaaaaaaa-3333-4333-8333-333333333331','aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-4444-4444-8444-444444444441',1,'41790000000@c.us'),
  ('aaaaaaaa-3333-4333-8333-333333333332','aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-4444-4444-8444-444444444442',2,'41790000001@c.us');
 do $$ begin
+ assert not has_function_privilege('anon','public.web_kit_whatsapp_batch_inspect(uuid,uuid)','execute');
+ assert not has_function_privilege('authenticated','public.web_kit_whatsapp_batch_inspect(uuid,uuid)','execute');
  assert not has_function_privilege('anon','public.web_kit_whatsapp_batch_create(uuid,uuid,text,jsonb)','execute');
  assert not has_function_privilege('authenticated','public.web_kit_whatsapp_batch_create(uuid,uuid,text,jsonb)','execute');
  assert not has_function_privilege('anon','public.web_kit_whatsapp_batch_claim(uuid,uuid,text)','execute');
@@ -26,11 +28,17 @@ begin
  assert public.web_kit_whatsapp_batch_create('cccccccc-2222-4222-8222-222222222222',a,repeat('a',64),'["41790000003@c.us","120363123456789000@g.us"]');
  assert not public.web_kit_whatsapp_batch_create('cccccccc-2222-4222-8222-222222222222',a,repeat('a',64),'["41790000003@c.us"]');
  begin perform public.web_kit_whatsapp_batch_claim(b,a,repeat('b',64)); raise exception 'mismatched message accepted'; exception when invalid_parameter_value then null; end;
+ begin perform public.web_kit_whatsapp_batch_inspect(b,'bbbbbbbb-1111-4111-8111-111111111111'); raise exception 'wrong owner could inspect'; exception when insufficient_privilege then null; end;
+ r:=public.web_kit_whatsapp_batch_inspect(b,a);
+ assert jsonb_array_length(r->'items')=2;
+ assert r->'items'->0->>'status'='queued';
+ assert not (r->'items'->0 ? 'request_key');
  r:=public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64)); assert r->>'state'='claimed'; assert (r->>'item_id')::uuid=i;
  assert public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64))->>'state'='blocked';
  assert not public.web_kit_whatsapp_batch_finish(b,a,i,k,'accepted',null);
  assert public.web_kit_whatsapp_batch_finish(b,a,i,k,'unknown',null);
  assert not public.web_kit_whatsapp_batch_finish(b,a,i,k,'accepted','FAKE');
  assert public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64))->>'state'='blocked';
-end $$;
+ r:=public.web_kit_whatsapp_batch_inspect(b,a); assert r->'items'->0->>'status'='unknown';
+end $;
 reset role;
