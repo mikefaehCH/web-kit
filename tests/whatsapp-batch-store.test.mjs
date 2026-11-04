@@ -40,3 +40,9 @@ test('manuell geprüfter unklarer Status bleibt sichtbar',async()=>{
   const store=createBatchStore(async()=>({data:{items:[{item_id:'i',chat_id:'41790000000@c.us',status:'reviewed'}]}}));
   assert.equal((await store.inspect(args))[0].status,'reviewed');
 });
+
+test('Statusklärung erfordert ausdrückliche Bestätigung',async()=>{
+  let calls=0;const store=createBatchStore(async(name,params)=>{calls++;assert.equal(name,'web_kit_whatsapp_batch_resolve');assert.equal(params.p_confirm,true);return {data:true};});
+  for (const confirmed of [false,null,undefined,'true']) await assert.rejects(store.resolve({...args,itemId:'i',confirmed}));
+  assert.equal(calls,0);assert.equal(await store.resolve({...args,itemId:'i',confirmed:true}),true);assert.equal(calls,1);
+});
