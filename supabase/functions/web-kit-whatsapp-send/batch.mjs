@@ -9,6 +9,7 @@ export async function runBatch({ store, batchId, actorId, send }) {
     // in this batch is pending or unknown, including after a worker crash.
     const item = await store.claimNext({ batchId, actorId });
     if (item === null) return { processed, stopped: false };
+    if (item?.blocked === true) return { processed, stopped: true, reason: 'blocked' };
     if (!item || typeof item.id !== 'string' || typeof item.requestKey !== 'string') throw new Error('Invalid claim');
     let outcome;
     try { outcome = await send(item); } catch { outcome = { status: 'unknown' }; }
