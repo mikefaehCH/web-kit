@@ -178,4 +178,59 @@ begin
 end $$;
 
 
+
+-- Private project associations; this does not mutate provider contacts.
+create table public.web_kit_wa_recipient_projects (
+  actor_id uuid not null,
+  project_slug text not null check (project_slug ~ '^[a-z0-9][a-z0-9-]{0,47}$'),
+  chat_id text not null check (chat_id ~ '^([0-9]{6,20}@c[.]us|[0-9]{6,24}(-[0-9]{1,20})?@g[.]us)$'),
+  created_at timestamptz not null default now(),
+  primary key (actor_id,project_slug,chat_id)
+);
+alter table public.web_kit_wa_recipient_projects enable row level security;
+revoke all on public.web_kit_wa_recipient_projects from public, anon, authenticated, service_role;
+
+create function public.web_kit_whatsapp_project_recipients(p_actor uuid,p_project text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare result jsonb;
+begin
+  if coalesce(auth.role(),'') <> 'service_role' or not exists (
+    select 1 from auth.users u where u.id=p_actor and u.deleted_at is null
+      and (u.banned_until is null or u.banned_until <= now())
+      and u.raw_app_meta_data->>'web_kit_admin'='true'
+  ) then raise exception 'forbidden' using errcode='42501'; end if;
+  if p_project is null or p_project !~ '^[a-z0-9][a-z0-9-]{0,47}$' then raise exception 'invalid project' using errcode='22023'; end if;
+  select coalesce(jsonb_agg(chat_id order by chat_id),'[]'::jsonb) into result
+    from public.web_kit_wa_recipient_projects where actor_id=p_actor and project_slug=p_project;
+  return result;
+end $$;
+
+create function public.web_kit_whatsapp_project_set_recipient(p_actor uuid,p_project text,p_chat text,p_selected boolean)
+returns boolean language plpgsql security definer set search_path = '' as $$
+begin
+  if coalesce(auth.role(),'') <> 'service_role' or not exists (
+    select 1 from auth.users u where u.id=p_actor and u.deleted_at is null
+      and (u.banned_until is null or u.banned_until <= now())
+      and u.raw_app_meta_data->>'web_kit_admin'='true'
+  ) then raise exception 'forbidden' using errcode='42501'; end if;
+  if p_project is null or p_project !~ '^[a-z0-9][a-z0-9-]{0,47}$' or p_chat is null
+    or p_chat !~ '^([0-9]{6,20}@c[.]us|[0-9]{6,24}(-[0-9]{1,20})?@g[.]us)$'
+    or p_selected is null then return false; end if;
+  perform pg_advisory_xact_lock(hashtextextended('web_kit_wa_projects:' || p_actor::text,0));
+  if p_selected then
+    if (select count(*) from public.web_kit_wa_recipient_projects where actor_id=p_actor) >= 1000
+       and not exists(select 1 from public.web_kit_wa_recipient_projects where actor_id=p_actor and project_slug=p_project and chat_id=p_chat)
+       then return false; end if;
+    insert into public.web_kit_wa_recipient_projects(actor_id,project_slug,chat_id) values(p_actor,p_project,p_chat)
+      on conflict do nothing;
+  else
+    delete from public.web_kit_wa_recipient_projects where actor_id=p_actor and project_slug=p_project and chat_id=p_chat;
+  end if;
+  return true;
+end $$;
+revoke all on function public.web_kit_whatsapp_project_recipients(uuid,text) from public, anon, authenticated;
+revoke all on function public.web_kit_whatsapp_project_set_recipient(uuid,text,text,boolean) from public, anon, authenticated;
+grant execute on function public.web_kit_whatsapp_project_recipients(uuid,text) to service_role;
+grant execute on function public.web_kit_whatsapp_project_set_recipient(uuid,text,text,boolean) to service_role;
+
 commit;
