@@ -99,23 +99,6 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     return json({ error: "Invalid JSON" }, 400);
   }
   if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "Invalid JSON" }, 400);
-  // Prepared metadata only. Sending remains disabled until the complete flow is validated.
-  if ((body as { action?: unknown }).action === "create_batch") {
-    const { batchId, message, recipients } = body as { batchId?: unknown; message?: unknown; recipients?: unknown };
-    if (typeof batchId !== "string" || !UUID_V4.test(batchId) ||
-        typeof message !== "string" || !message.trim() || message.length > MAX_LENGTH ||
-        !Array.isArray(recipients) || recipients.length < 1 || recipients.length > 10 ||
-        recipients.some(id => typeof id !== "string" || !(/^[0-9]{6,20}@c[.]us$/.test(id) || /^[0-9]{6,24}(?:-[0-9]{1,20})?@g[.]us$/.test(id))) ||
-        new Set(recipients).size !== recipients.length) return json({ error: "Invalid batch" }, 400);
-    const hash = await sha256Hex(message.trim());
-    let result: RpcResult;
-    try { result = await deps.serviceRpc("web_kit_whatsapp_batch_create", {
-      p_batch: batchId.toLowerCase(), p_actor: user.id, p_message_hash: hash, p_chats: recipients,
-    }); } catch { return json({ error: "Batch storage unavailable" }, 503); }
-    if (result.error) return json({ error: "Batch storage unavailable" }, 503);
-    if (result.data !== true) return json({ error: "Batch not created" }, 409);
-    return json({ ok: true, batchId: batchId.toLowerCase() }, 201);
-  }
   // Nur explizit auf Anforderung eines MFA-geschützten Admins. Keine Kontaktdaten in Logs.
   if ((body as { action?: unknown }).action === "list_contacts") {
     let response: Response;
