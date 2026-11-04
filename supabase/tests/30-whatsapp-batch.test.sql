@@ -7,6 +7,7 @@ insert into public.web_kit_wa_batch_items(id,batch_id,request_key,position,chat_
  ('aaaaaaaa-3333-4333-8333-333333333331','aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-4444-4444-8444-444444444441',1,'41790000000@c.us'),
  ('aaaaaaaa-3333-4333-8333-333333333332','aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-4444-4444-8444-444444444442',2,'41790000001@c.us');
 do $$ begin
+ assert not has_function_privilege('authenticated','public.web_kit_whatsapp_batch_resolve(uuid,uuid,uuid,boolean)','execute');
  assert not has_function_privilege('anon','public.web_kit_whatsapp_batch_inspect(uuid,uuid)','execute');
  assert not has_function_privilege('authenticated','public.web_kit_whatsapp_batch_inspect(uuid,uuid)','execute');
  assert not has_function_privilege('anon','public.web_kit_whatsapp_batch_create(uuid,uuid,text,jsonb)','execute');
@@ -40,6 +41,12 @@ begin
  assert not public.web_kit_whatsapp_batch_finish(b,a,i,k,'accepted','FAKE');
  assert public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64))->>'state'='blocked';
  r:=public.web_kit_whatsapp_batch_inspect(b,a); assert r->'items'->0->>'status'='unknown';
+ assert not public.web_kit_whatsapp_batch_resolve(b,a,i,false);
+ begin perform public.web_kit_whatsapp_batch_resolve(b,'bbbbbbbb-1111-4111-8111-111111111111',i,true); raise exception 'wrong owner could resolve'; exception when insufficient_privilege then null; end;
+ assert public.web_kit_whatsapp_batch_resolve(b,a,i,true);
+ assert not public.web_kit_whatsapp_batch_resolve(b,a,i,true);
+ r:=public.web_kit_whatsapp_batch_inspect(b,a); assert r->'items'->0->>'status'='reviewed';
+ r:=public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64)); assert r->>'state'='claimed'; assert r->>'item_id'='aaaaaaaa-3333-4333-8333-333333333332';
 end $$;
 -- Separate actor: quota permits 10 batch creations in one hour.
 do $$ declare actor uuid:='bbbbbbbb-1111-4111-8111-111111111111'; ok_count integer:=0;
