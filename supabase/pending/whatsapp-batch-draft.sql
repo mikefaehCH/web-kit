@@ -60,7 +60,7 @@ begin
   if coalesce(auth.role(),'') <> 'service_role' then raise exception 'forbidden' using errcode='42501'; end if;
   if not exists (select 1 from auth.users u where u.id=p_actor and u.deleted_at is null and (u.banned_until is null or u.banned_until <= now()) and u.raw_app_meta_data->>'web_kit_admin'='true') then raise exception 'forbidden' using errcode='42501'; end if;
   if not exists (select 1 from public.web_kit_wa_batches b where b.id=p_batch and b.actor_id=p_actor) then raise exception 'forbidden' using errcode='42501'; end if;
-  select coalesce(jsonb_agg(jsonb_build_object('item_id',i.id,'chat_id',i.chat_id,'status',i.status) order by i.position),'[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object('item_id',i.id,'chat_id',i.chat_id,'status',i.status,'review_available',(i.status='unknown' or (i.status='pending' and i.claimed_at < now()-interval '5 minutes'))) order by i.position),'[]'::jsonb)
     into result from public.web_kit_wa_batch_items i where i.batch_id=p_batch;
   return jsonb_build_object('items',result);
 end $$;
