@@ -53,18 +53,22 @@ revoke all on function public.web_kit_whatsapp_batch_create(uuid,uuid,text,jsonb
 grant execute on function public.web_kit_whatsapp_batch_create(uuid,uuid,text,jsonb) to service_role;
 
 -- Find recent batches for this actor after a browser/device restart.
-create function public.web_kit_whatsapp_batch_list(p_actor uuid)
+create function public.web_kit_whatsapp_batch_list(p_actor uuid,p_before uuid default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare result jsonb;
+declare result jsonb; cursor_time timestamptz;
 begin
   if coalesce(auth.role(),'') <> 'service_role' then raise exception 'forbidden' using errcode='42501'; end if;
   if not exists (select 1 from auth.users u where u.id=p_actor and u.deleted_at is null and (u.banned_until is null or u.banned_until <= now()) and u.raw_app_meta_data->>'web_kit_admin'='true') then raise exception 'forbidden' using errcode='42501'; end if;
-  select coalesce(jsonb_agg(jsonb_build_object('batch_id',x.id,'created_at',x.created_at) order by x.created_at desc,x.id),'[]'::jsonb)
-  into result from (select id,created_at from public.web_kit_wa_batches where actor_id=p_actor order by created_at desc,id limit 20) x;
+  if p_before is not null then
+    select created_at into cursor_time from public.web_kit_wa_batches where id=p_before and actor_id=p_actor;
+    if not found then raise exception 'invalid cursor' using errcode='22023'; end if;
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object('batch_id',x.id,'created_at',x.created_at) order by x.created_at desc,x.id desc),'[]'::jsonb)
+  into result from (select id,created_at from public.web_kit_wa_batches where actor_id=p_actor and (p_before is null or (created_at,id)<(cursor_time,p_before)) order by created_at desc,id desc limit 20) x;
   return jsonb_build_object('batches',result);
 end $$;
-revoke all on function public.web_kit_whatsapp_batch_list(uuid) from public, anon, authenticated;
-grant execute on function public.web_kit_whatsapp_batch_list(uuid) to service_role;
+revoke all on function public.web_kit_whatsapp_batch_list(uuid,uuid) from public, anon, authenticated;
+grant execute on function public.web_kit_whatsapp_batch_list(uuid,uuid) to service_role;
 
 -- Status inspection returns no message, token, request key or provider ID.
 create function public.web_kit_whatsapp_batch_inspect(p_batch uuid,p_actor uuid)
