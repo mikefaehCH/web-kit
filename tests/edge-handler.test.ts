@@ -289,3 +289,23 @@ test("unbekannte Aktion wird vor Claim und Versand blockiert", async () => {
   assert.equal((await handle(req({ ...ok, action: "unknown" }), t.deps)).status, 400);
   assert.equal(t.rpc.length + t.fetches.length, 0);
 });
+
+test("Batch-Erstellung bindet verifizierten Admin und Nachrichtenhash ohne Provideraufruf", async () => {
+  const t=setup(); const batchId="aaaaaaaa-1111-4111-8111-111111111111";
+  const res=await handle(req({action:"create_batch",batchId,message:" Hallo ",recipients:["41790000000@c.us"]}),t.deps);
+  assert.equal(res.status,201); assert.equal(t.fetches.length,0);
+  assert.equal(t.rpc[0].fn,"web_kit_whatsapp_batch_create"); assert.equal(t.rpc[0].args.p_actor,ADMIN.id);
+  assert.match(String(t.rpc[0].args.p_message_hash),/^[0-9a-f]{64}$/);
+  assert.deepEqual(t.rpc[0].args.p_chats,["41790000000@c.us"]);
+});
+test("Batch-Erstellung lehnt ungültige oder doppelte Empfänger vor Speicherung ab", async () => {
+  for (const recipients of [[],["bad"],["41790000000@c.us","41790000000@c.us"],Array(11).fill("41790000000@c.us")]) {
+    const t=setup(); const res=await handle(req({action:"create_batch",batchId:"aaaaaaaa-1111-4111-8111-111111111111",message:"Hi",recipients}),t.deps);
+    assert.equal(res.status,400); assert.equal(t.rpc.length+t.fetches.length,0);
+  }
+});
+test("Batch-Erstellung verlangt AAL2 und blockiert bei Datenbankfehler", async () => {
+  const reqBody={action:"create_batch",batchId:"aaaaaaaa-1111-4111-8111-111111111111",message:"Hi",recipients:["41790000000@c.us"]};
+  const unauthorized=setup({user:{...ADMIN,aal:"aal1"}});assert.equal((await handle(req(reqBody),unauthorized.deps)).status,403);assert.equal(unauthorized.rpc.length,0);
+  const broken=setup({finishResult:{data:null,error:"private"}});const res=await handle(req(reqBody),broken.deps);assert.equal(res.status,503);assert.ok(!(await res.text()).includes("private"));assert.equal(broken.fetches.length,0);
+});
