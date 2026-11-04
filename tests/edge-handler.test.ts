@@ -391,3 +391,22 @@ test("Batchliste validiert Cursor und verwendet stets den angemeldeten Eigentüm
   assert.deepEqual(t.rpc[0].args,{p_actor:ADMIN.id,p_before:before.toLowerCase()});
   assert.equal(t.fetches.length,0);
 });
+
+test("Projektzuordnung prüft Eingaben, MFA und Eigentümer ohne Provideraufruf",async()=>{
+  const env={WEB_KIT_WHATSAPP_BATCH_ENABLED:"true"};
+  const low=setup({env,user:{...ADMIN,aal:"aal1"}});
+  assert.equal((await handle(req({action:"batch_project_list",project:"camino"}),low.deps)).status,403);
+  assert.equal(low.rpc.length+low.fetches.length,0);
+  const t=setup({env,rpcImpl:async(fn)=>({data:fn==="web_kit_whatsapp_project_recipients"?["41790000000@c.us"]:true,error:null})});
+  for(const project of ["../../x","UPPER","",null]){
+    assert.equal((await handle(req({action:"batch_project_list",project}),t.deps)).status,400);
+  }
+  assert.equal(t.rpc.length,0);
+  let res=await handle(req({action:"batch_project_list",project:"camino",actorId:"other"}),t.deps);
+  assert.equal(res.status,200);assert.deepEqual(await res.json(),{recipients:["41790000000@c.us"]});
+  assert.deepEqual(t.rpc[0].args,{p_actor:ADMIN.id,p_project:"camino"});
+  res=await handle(req({action:"batch_project_set",project:"camino",chatId:"41790000000@c.us",selected:true,actorId:"other"}),t.deps);
+  assert.equal(res.status,200);assert.deepEqual(t.rpc[1].args,{p_actor:ADMIN.id,p_project:"camino",p_chat:"41790000000@c.us",p_selected:true});
+  assert.equal((await handle(req({action:"batch_project_set",project:"camino",chatId:"invalid",selected:true}),t.deps)).status,400);
+  assert.equal(t.fetches.length,0);
+});
