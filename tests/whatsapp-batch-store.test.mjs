@@ -24,3 +24,14 @@ test('non-true completion does not report success',async()=>{
   const store=createBatchStore(async()=>({data:null}));
   assert.equal(await store.finish({...args,itemId:'item',requestKey:'key',outcome:{status:'unknown'}}),false);
 });
+
+test('Statusabfrage gibt nur Empfänger und verständlichen Status zurück',async()=>{
+  let seen; const store=createBatchStore(async(name,params)=>{seen={name,params};return {data:{items:[{item_id:'item',chat_id:'41790000000@c.us',status:'accepted',provider_id:'ignored'}]}};});
+  assert.deepEqual(await store.inspect(args),[{id:'item',chatId:'41790000000@c.us',status:'accepted'}]);
+  assert.deepEqual(seen,{name:'web_kit_whatsapp_batch_inspect',params:{p_batch:'batch',p_actor:'owner'}});
+});
+test('defekte oder unbekannte Statusantwort wird abgewiesen',async()=>{
+  for (const items of [null,[{item_id:'a',chat_id:'b',status:'delivered'}],Array(11).fill({item_id:'a',chat_id:'b',status:'queued'})]) {
+    await assert.rejects(createBatchStore(async()=>({data:{items}})).inspect(args));
+  }
+});
