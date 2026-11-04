@@ -26,8 +26,8 @@ test('non-true completion does not report success',async()=>{
 });
 
 test('Statusabfrage gibt nur Empfänger und verständlichen Status zurück',async()=>{
-  let seen; const store=createBatchStore(async(name,params)=>{seen={name,params};return {data:{items:[{item_id:'item',chat_id:'41790000000@c.us',status:'accepted',provider_id:'ignored'}]}};});
-  assert.deepEqual(await store.inspect(args),[{id:'item',chatId:'41790000000@c.us',status:'accepted'}]);
+  let seen; const store=createBatchStore(async(name,params)=>{seen={name,params};return {data:{items:[{item_id:'item',chat_id:'41790000000@c.us',status:'accepted',review_available:false,provider_id:'ignored'}]}};});
+  assert.deepEqual(await store.inspect(args),[{id:'item',chatId:'41790000000@c.us',status:'accepted',reviewAvailable:false}]);
   assert.deepEqual(seen,{name:'web_kit_whatsapp_batch_inspect',params:{p_batch:'batch',p_actor:'owner'}});
 });
 test('defekte oder unbekannte Statusantwort wird abgewiesen',async()=>{
@@ -37,7 +37,7 @@ test('defekte oder unbekannte Statusantwort wird abgewiesen',async()=>{
 });
 
 test('manuell geprüfter unklarer Status bleibt sichtbar',async()=>{
-  const store=createBatchStore(async()=>({data:{items:[{item_id:'i',chat_id:'41790000000@c.us',status:'reviewed'}]}}));
+  const store=createBatchStore(async()=>({data:{items:[{item_id:'i',chat_id:'41790000000@c.us',status:'reviewed',review_available:false}]}}));
   assert.equal((await store.inspect(args))[0].status,'reviewed');
 });
 
