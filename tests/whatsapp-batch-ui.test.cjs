@@ -10,7 +10,7 @@ class Element {
   replaceChildren(...nodes){this.children=nodes;}
   setAttribute(){} removeAttribute(){}
 }
-function setup(enabled, history=[]){
+function setup(enabled, history=[], failInspect=false){
   const nodes=new Map(), actions=[];
   const document={getElementById(id){if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},createElement(){return new Element();},createTextNode(text){return {text};}};
   const window={WEB_KIT_WHATSAPP_BATCH_UI_ENABLED:enabled,WEB_KIT_GET_ACCESS_TOKEN:async()=>'fake',WEB_KIT_WHATSAPP_ENDPOINT:'https://example.invalid',confirm:()=>true};
@@ -20,7 +20,7 @@ function setup(enabled, history=[]){
     if(req.action==='batch_create')data={ok:true};
     if(req.action==='batch_send')data={stopped:false};
     if(req.action==='batch_inspect')data={items:[{id:'i',chatId:'41790000000@c.us',status:'accepted',reviewAvailable:false}]};
-    return {ok:true,json:async()=>data};};
+    return {ok:!(failInspect && req.action==='batch_inspect'),json:async()=>data};};
   vm.runInNewContext(fs.readFileSync('admin/batch-ui.js','utf8'),{window,document,fetch,crypto:{randomUUID:()=> 'aaaaaaaa-1111-4111-8111-111111111111'}});
   return {nodes,actions,document};
 }
@@ -48,5 +48,15 @@ test('older history can be opened without sending a message',async()=>{
   assert.equal(el('batch-jobs').children.length,1);
   await el('batch-jobs').children[0].children[0].fire('click');
   assert.equal(t.actions[2].action,'batch_inspect');assert.equal(t.actions[2].batchId,'batch-20');
+  assert.ok(!t.actions.some(a=>a.action==='batch_send'));
+});
+
+test('failed status lookup cannot authorise resumption of that batch',async()=>{
+  const t=setup(true,[{id:'batch-1',createdAt:'date'}],true),el=id=>t.document.getElementById(id);
+  await el('batch-load-jobs').fire('click');
+  await el('batch-jobs').children[0].children[0].fire('click');
+  el('batch-message').value='Hallo';el('batch-review-button').fire('click');
+  assert.equal(el('batch-review').hidden,true);
+  await el('batch-confirm').fire('click');
   assert.ok(!t.actions.some(a=>a.action==='batch_send'));
 });
