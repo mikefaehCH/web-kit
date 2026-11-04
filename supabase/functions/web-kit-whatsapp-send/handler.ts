@@ -4,6 +4,9 @@
 // Ablauf: Origin -> JWT -> Admin (app_metadata) -> Eingabe -> claim (service_role, atomar,
 // Idempotenz + Rate-Limit) -> GREEN-API an fest konfigurierte Gruppe -> finish (service_role).
 
+import { createBatchStore } from "./batch-store.mjs";
+import { prepareMessage, sendPreparedBatch } from "./bound-send.mjs";
+
 export const GROUP_ID = "120363431174972238@g.us";
 export const MAX_LENGTH = 4000;
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -99,6 +102,61 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     return json({ error: "Invalid JSON" }, 400);
   }
   if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "Invalid JSON" }, 400);
+  // New batch operations remain disabled by default until migration and security
+  // review are complete. Authentication, admin and AAL2 are checked above.
+  const action = (body as { action?: unknown }).action;
+  if (typeof action === "string" && action.startsWith("batch_")) {
+    if (deps.env("WEB_KIT_WHATSAPP_BATCH_ENABLED") !== "true") return json({ error: "Batch sending unavailable" }, 503);
+    const { batchId, itemId, message, recipients, confirmed } = body as {
+      batchId?: unknown; itemId?: unknown; message?: unknown; recipients?: unknown; confirmed?: unknown;
+    };
+    if (typeof batchId !== "string" || !UUID_V4.test(batchId)) return json({ error: "Invalid batch" }, 400);
+    const batch = batchId.toLowerCase();
+    const store = createBatchStore(deps.serviceRpc);
+    try {
+      if (action === "batch_create") {
+        if (typeof message !== "string" || !message.trim() || message.length > MAX_LENGTH ||
+          !Array.isArray(recipients) || recipients.length < 1 || recipients.length > 10 ||
+          recipients.some(id => typeof id !== "string" || !(/^[0-9]{6,20}@c[.]us$/.test(id) || /^[0-9]{6,24}(?:-[0-9]{1,20})?@g[.]us$/.test(id))) ||
+          new Set(recipients).size !== recipients.length) return json({ error: "Invalid batch" }, 400);
+        const prepared = await prepareMessage(message);
+        const created = await deps.serviceRpc("web_kit_whatsapp_batch_create", {
+          p_batch: batch, p_actor: user.id, p_message_hash: prepared.messageHash, p_chats: recipients,
+        });
+        if (created.error) return json({ error: "Batch unavailable" }, 503);
+        if (created.data !== true) return json({ error: "Batch not created" }, 409);
+        return json({ ok: true, batchId: batch }, 201);
+      }
+      if (action === "batch_inspect") return json({ items: await store.inspect({ batchId: batch, actorId: user.id }) });
+      if (action === "batch_resolve") {
+        if (typeof itemId !== "string" || !UUID_V4.test(itemId) || confirmed !== true) return json({ error: "Confirmation required" }, 400);
+        const ok = await store.resolve({ batchId: batch, actorId: user.id, itemId: itemId.toLowerCase(), confirmed: true });
+        return ok ? json({ ok: true }) : json({ error: "Item cannot be reviewed" }, 409);
+      }
+      if (action === "batch_send") {
+        if (typeof message !== "string" || !message.trim() || message.length > MAX_LENGTH) return json({ error: "Invalid message" }, 400);
+        const result = await sendPreparedBatch({ store, batchId: batch, actorId: user.id, message,
+          send: async ({ chatId, message: text }: { chatId: string; message: string }) => {
+            if (typeof chatId !== "string" || !(/^[0-9]{6,20}@c[.]us$/.test(chatId) || /^[0-9]{6,24}(?:-[0-9]{1,20})?@g[.]us$/.test(chatId))) return { status: "unknown" };
+            try {
+              const upstream = await deps.fetch(host + "/waInstance" + encodeURIComponent(instance) + "/sendMessage/" + encodeURIComponent(apiToken), {
+                method: "POST", redirect: "error", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chatId, message: text }), signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+              });
+              if (!upstream.ok) return { status: "unknown" };
+              const response = await upstream.json().catch(() => null) as { idMessage?: unknown } | null;
+              if (!response || typeof response.idMessage !== "string" || !PROVIDER_ID.test(response.idMessage)) return { status: "unknown" };
+              return { status: "accepted", providerId: response.idMessage };
+            } catch { return { status: "unknown" }; }
+          },
+        });
+        return json(result);
+      }
+      return json({ error: "Invalid action" }, 400);
+    } catch {
+      return json({ error: "Batch operation unavailable; check status before trying again" }, 503);
+    }
+  }
   // Nur explizit auf Anforderung eines MFA-geschützten Admins. Keine Kontaktdaten in Logs.
   if ((body as { action?: unknown }).action === "list_contacts") {
     let response: Response;
@@ -129,7 +187,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     }
     return json({ contacts: result, incomplete: result.length !== contacts.length });
   }
-  const { message, requestKey, action } = body as { message?: unknown; requestKey?: unknown; action?: unknown };
+  const { message, requestKey } = body as { message?: unknown; requestKey?: unknown };
   // Legacy-Aufrufe bleiben auf Camino beschränkt. Neue Empfänger nur nach expliziter Aktion.
   const destination = GROUP_ID;
   if (action === "send_selected") {
