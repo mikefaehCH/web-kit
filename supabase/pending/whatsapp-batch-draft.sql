@@ -44,6 +44,21 @@ end $$;
 revoke all on function public.web_kit_whatsapp_batch_create(uuid,uuid,text,jsonb) from public, anon, authenticated;
 grant execute on function public.web_kit_whatsapp_batch_create(uuid,uuid,text,jsonb) to service_role;
 
+-- Status inspection returns no message, token, request key or provider ID.
+create function public.web_kit_whatsapp_batch_inspect(p_batch uuid,p_actor uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare result jsonb;
+begin
+  if coalesce(auth.role(),'') <> 'service_role' then raise exception 'forbidden' using errcode='42501'; end if;
+  if not exists (select 1 from auth.users u where u.id=p_actor and u.deleted_at is null and (u.banned_until is null or u.banned_until <= now()) and u.raw_app_meta_data->>'web_kit_admin'='true') then raise exception 'forbidden' using errcode='42501'; end if;
+  if not exists (select 1 from public.web_kit_wa_batches b where b.id=p_batch and b.actor_id=p_actor) then raise exception 'forbidden' using errcode='42501'; end if;
+  select coalesce(jsonb_agg(jsonb_build_object('item_id',i.id,'chat_id',i.chat_id,'status',i.status) order by i.position),'[]'::jsonb)
+    into result from public.web_kit_wa_batch_items i where i.batch_id=p_batch;
+  return jsonb_build_object('items',result);
+end $$;
+revoke all on function public.web_kit_whatsapp_batch_inspect(uuid,uuid) from public, anon, authenticated;
+grant execute on function public.web_kit_whatsapp_batch_inspect(uuid,uuid) to service_role;
+
 create function public.web_kit_whatsapp_batch_claim(p_batch uuid, p_actor uuid, p_message_hash text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare item public.web_kit_wa_batch_items%rowtype;
