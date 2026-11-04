@@ -20,14 +20,15 @@ jobs:
           npm run --prefix admin build:vendor
           git diff --exit-code -- admin/vendor/supabase.js
           node admin/build-static.mjs
-          node --input-type=module -e "import{readdirSync}from'node:fs';const f=readdirSync('admin/dist').sort();if(f.join(',')!=='auth-policy.js,auth.js,dashboard-data.js,dashboard.js,deployment.json,navigation.js,vendor,whatsapp.css,whatsapp.html,whatsapp.js'||readdirSync('admin/dist/vendor').sort().join(',')!=='LICENSES.txt,supabase.js')process.exit(1)"
+          node --input-type=module -e "import{readdirSync}from'node:fs';const f=readdirSync('admin/dist').sort();if(f.join(',')!=='auth-policy.js,auth.js,batch-ui.js,dashboard-data.js,dashboard.js,deployment.json,navigation.js,vendor,whatsapp.css,whatsapp.html,whatsapp.js'||readdirSync('admin/dist/vendor').sort().join(',')!=='LICENSES.txt,supabase.js')process.exit(1)"
       - run: node --check admin/navigation.js
       - run: node --check admin/whatsapp.js
+      - run: node --check admin/batch-ui.js
       - run: node --check admin/auth.js
       - run: node --check admin/auth-policy.js
       - run: node --check admin/dashboard.js
       - run: node --check admin/dashboard-data.js
-      - run: node --test tests/whatsapp-static.mjs tests/admin-dashboard.test.mjs tests/admin-navigation.test.mjs tests/whatsapp-logout.cjs
+      - run: node --test tests/whatsapp-static.mjs tests/admin-dashboard.test.mjs tests/admin-navigation.test.mjs tests/whatsapp-logout.cjs tests/whatsapp-batch-ui.test.cjs
 
   edge-function:
     runs-on: ubuntu-latest
