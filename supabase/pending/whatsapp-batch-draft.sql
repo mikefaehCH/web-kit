@@ -85,16 +85,22 @@ grant execute on function public.web_kit_whatsapp_batch_resolve(uuid,uuid,uuid,b
 
 create function public.web_kit_whatsapp_batch_claim(p_batch uuid, p_actor uuid, p_message_hash text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare item public.web_kit_wa_batch_items%rowtype;
+declare item public.web_kit_wa_batch_items%rowtype; recent_count integer;
 begin
   if coalesce(auth.role(),'') <> 'service_role' then raise exception 'forbidden' using errcode='42501'; end if;
   if not exists (select 1 from auth.users u where u.id=p_actor and u.deleted_at is null and (u.banned_until is null or u.banned_until <= now()) and u.raw_app_meta_data->>'web_kit_admin'='true') then raise exception 'forbidden' using errcode='42501'; end if;
+  -- This is the same actor lock used by the existing legacy sender.
+  perform pg_advisory_xact_lock(hashtextextended('web_kit_whatsapp:' || p_actor::text,0));
   perform 1 from public.web_kit_wa_batches b where b.id=p_batch and b.actor_id=p_actor for update;
   if not found then raise exception 'forbidden' using errcode='42501'; end if;
   if p_message_hash is null or not exists (select 1 from public.web_kit_wa_batches where id=p_batch and message_hash=p_message_hash) then raise exception 'message mismatch' using errcode='22023'; end if;
   if exists(select 1 from public.web_kit_wa_batch_items i where i.batch_id=p_batch and i.status in ('pending','unknown')) then return jsonb_build_object('state','blocked'); end if;
   select * into item from public.web_kit_wa_batch_items i where i.batch_id=p_batch and i.status='queued' order by i.position limit 1;
   if not found then return jsonb_build_object('state','complete'); end if;
+  select (select count(*) from public.web_kit_whatsapp_dispatches d where d.actor_id=p_actor and d.created_at > now()-interval '1 hour')
+       + (select count(*) from public.web_kit_wa_batch_items i join public.web_kit_wa_batches b on b.id=i.batch_id where b.actor_id=p_actor and i.claimed_at > now()-interval '1 hour')
+    into recent_count;
+  if recent_count >= 10 then return jsonb_build_object('state','rate_limited'); end if;
   update public.web_kit_wa_batch_items set status='pending', claimed_at=now() where id=item.id;
   return jsonb_build_object('state','claimed','item_id',item.id,'request_key',item.request_key,'chat_id',item.chat_id);
 end $$;
@@ -116,4 +122,42 @@ revoke all on function public.web_kit_whatsapp_batch_claim(uuid,uuid,text) from 
 revoke all on function public.web_kit_whatsapp_batch_finish(uuid,uuid,uuid,uuid,text,text) from public, anon, authenticated;
 grant execute on function public.web_kit_whatsapp_batch_claim(uuid,uuid,text) to service_role;
 grant execute on function public.web_kit_whatsapp_batch_finish(uuid,uuid,uuid,uuid,text,text) to service_role;
+-- Pending design: extend the legacy limit to count batch dispatch attempts under the same actor lock.
+create or replace function public.web_kit_whatsapp_claim(p_actor uuid, p_key uuid, p_hash text)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare recent_count integer;
+begin
+  if coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'service role required' using errcode = '42501';
+  end if;
+  if p_actor is null or p_key is null or p_hash is null or p_hash !~ '^[0-9a-f]{64}$' then
+    return false;
+  end if;
+  -- Admin-Recht zusätzlich in der Datenbank prüfen (vertrauenswürdige app_metadata, nicht user_metadata).
+  if not exists (
+    select 1 from auth.users u
+    where u.id = p_actor
+      and u.raw_app_meta_data ->> 'web_kit_admin' = 'true'
+      and u.deleted_at is null
+      and (u.banned_until is null or u.banned_until <= now())
+  ) then
+    return false;
+  end if;
+  -- Serialisiert parallele Versuche desselben Admins (Idempotenz und Rate-Limit atomar).
+  perform pg_advisory_xact_lock(hashtextextended('web_kit_whatsapp:' || p_actor::text, 0));
+  if exists (select 1 from public.web_kit_whatsapp_dispatches where actor_id = p_actor and request_key = p_key) then
+    return false;
+  end if;
+  select count(*) into recent_count from public.web_kit_whatsapp_dispatches
+   where actor_id = p_actor and created_at > now() - interval '1 hour';
+  select recent_count + count(*) into recent_count from public.web_kit_wa_batch_items i join public.web_kit_wa_batches b on b.id=i.batch_id where b.actor_id=p_actor and i.claimed_at > now()-interval '1 hour';
+  if recent_count >= 10 then
+    return false;
+  end if;
+  insert into public.web_kit_whatsapp_dispatches (actor_id, request_key, message_hash)
+  values (p_actor, p_key, p_hash);
+  return true;
+end $$;
+
+
 commit;
