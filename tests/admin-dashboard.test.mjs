@@ -161,7 +161,7 @@ test('static shell has password auth, no public signup, safe DOM rendering and G
   assert.doesNotMatch(auth, /signUp\(/);
   assert.doesNotMatch(dashboard, /innerHTML|insertAdjacentHTML/);
   assert.match(dashboard, /textContent/);
-  assert.match(render, /connect-src https:\/\/qoensghjemruqafrbmjd\.supabase\.co https:\/\/api\.github\.com/);
+  assert.match(render, /connect-src 'self' https:\/\/qoensghjemruqafrbmjd\.supabase\.co https:\/\/api\.github\.com;/);
 });
 
 
