@@ -66,3 +66,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Migrationen + Rechte-, Missbrauchs- und Parallelitätstests
         run: supabase/tests/run.sh
+
+      - name: Entwurf Versandläufe isoliert gegen PostgreSQL prüfen
+        run: |
+          psql -X -q -v ON_ERROR_STOP=1 -f supabase/pending/whatsapp-batch-draft.sql
+          psql -X -q -v ON_ERROR_STOP=1 -f supabase/tests/30-whatsapp-batch.test.sql
+          bash supabase/tests/31-whatsapp-batch-concurrency.sh
