@@ -107,12 +107,15 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   const action = (body as { action?: unknown }).action;
   if (typeof action === "string" && action.startsWith("batch_")) {
     if (deps.env("WEB_KIT_WHATSAPP_BATCH_ENABLED") !== "true") return json({ error: "Batch sending unavailable" }, 503);
-    const { batchId, itemId, message, recipients, confirmed } = body as {
-      batchId?: unknown; itemId?: unknown; message?: unknown; recipients?: unknown; confirmed?: unknown;
+    const { batchId, itemId, message, recipients, confirmed, before } = body as {
+      batchId?: unknown; itemId?: unknown; message?: unknown; recipients?: unknown; confirmed?: unknown; before?: unknown;
     };
     const store = createBatchStore(deps.serviceRpc);
     try {
-      if (action === "batch_list") return json({ batches: await store.list({ actorId: user.id }) });
+      if (action === "batch_list") {
+        if (before != null && (typeof before !== "string" || !UUID_V4.test(before))) return json({ error: "Invalid cursor" }, 400);
+        return json({ batches: await store.list({ actorId: user.id, before: typeof before === "string" ? before.toLowerCase() : null }) });
+      }
       if (typeof batchId !== "string" || !UUID_V4.test(batchId)) return json({ error: "Invalid batch" }, 400);
       const batch = batchId.toLowerCase();
       if (action === "batch_create") {

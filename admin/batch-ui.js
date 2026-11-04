@@ -3,7 +3,7 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
   const $ = id => document.getElementById(id);
   const ui = $('batch-ui'), status = $('batch-ui-status'), list = $('batch-contacts'), jobs = $('batch-jobs'), results = $('batch-results');
   const message = $('batch-message'), preview = $('batch-preview'), selected = new Map();
-  let epoch = 0, busy = false, activeBatch = null, reviewed = null;
+  let epoch = 0, busy = false, activeBatch = null, reviewed = null, historyCursor = null;
   ui.hidden = false;
   $('batch-unavailable').hidden = true;
   function item(parent, value) { const li = document.createElement('li'); li.textContent = value; parent.append(li); return li; }
@@ -50,10 +50,15 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
     status.textContent=data.incomplete?'Einige Kontakte konnten nicht geladen werden.':'Kontakte und Gruppen geladen.';
   }));
   $('batch-load-jobs').addEventListener('click',()=>work(async snap=>{
-    const data=await call('batch_list');if(!visible(snap))return;if(!Array.isArray(data.batches))throw Error('list');jobs.replaceChildren();
-    for(const job of data.batches){const li=document.createElement('li'), button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='Auftrag '+job.createdAt;button.addEventListener('click',()=>work(async n=>{activeBatch=job.id;resetReview();await inspect(job.id,n);if(visible(n))status.textContent='Für eine Fortsetzung den ursprünglichen Nachrichtentext erneut eingeben und prüfen.';}));li.append(button);jobs.append(li);}
-    status.textContent='Die letzten '+data.batches.length+' Aufträge werden angezeigt.';
+    historyCursor=null; await loadHistory(snap);
   }));
+  async function loadHistory(snap) {
+    const data=await call('batch_list',{before:historyCursor});if(!visible(snap))return;if(!Array.isArray(data.batches))throw Error('list');jobs.replaceChildren();
+    for(const job of data.batches){const li=document.createElement('li'), button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='Auftrag '+job.createdAt;button.addEventListener('click',()=>work(async n=>{activeBatch=job.id;resetReview();await inspect(job.id,n);if(visible(n))status.textContent='Für eine Fortsetzung den ursprünglichen Nachrichtentext erneut eingeben und prüfen.';}));li.append(button);jobs.append(li);}
+    historyCursor=data.batches.length===20?data.batches[data.batches.length-1].id:null;
+    if(historyCursor){const more=document.createElement('button');more.type='button';more.textContent='Ältere Aufträge';more.addEventListener('click',()=>work(loadHistory));jobs.append(more);}
+    status.textContent=data.batches.length+' Aufträge werden angezeigt.';
+  }
   message.addEventListener('input',resetReview);
   $('batch-review-button').addEventListener('click',()=>{
     if(busy)return;const text=message.value.trim(), recipients=[...selected.entries()];
