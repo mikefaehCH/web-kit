@@ -50,11 +50,35 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
       if(!contact || typeof contact.id!=='string' || typeof contact.name!=='string')continue;
       const li=document.createElement('li'), label=document.createElement('label'), checkbox=document.createElement('input');
       checkbox.type='checkbox'; checkbox.value=contact.id; checkbox.addEventListener('change',()=>{if(checkbox.checked)selected.set(contact.id,contact.name||contact.id);else selected.delete(contact.id);activeBatch=null;resetReview();});
-      label.append(checkbox,document.createTextNode(' '+(contact.name||contact.id)+' · '+contact.id)); li.append(label); list.append(li); contactRows.push({element:li,text:((contact.name||'')+' '+contact.id).toLocaleLowerCase('de-CH')});
+      label.append(checkbox,document.createTextNode(' '+(contact.name||contact.id)+' · '+contact.id)); li.append(label); list.append(li); contactRows.push({element:li,checkbox,id:contact.id,name:contact.name||contact.id,text:((contact.name||'')+' '+contact.id).toLocaleLowerCase('de-CH')});
     }
     filterContacts();
     status.textContent=data.incomplete?'Einige Kontakte konnten nicht geladen werden.':'Kontakte und Gruppen geladen.';
   }));
+
+  function projectKey() {
+    const value=$('batch-project').value.trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(value)) throw Error('invalid project');
+    return value;
+  }
+  $('batch-project-load').addEventListener('click',()=>work(async snap=>{
+    const project=projectKey();
+    if (!contactRows.length) { status.textContent='Bitte zuerst Kontakte und Gruppen laden.'; return; }
+    const data=await call('batch_project_list',{project}); if(!visible(snap))return;
+    if(!Array.isArray(data.recipients))throw Error('invalid project recipients');
+    const ids=new Set(data.recipients); selected.clear();activeBatch=null;resetReview();
+    for(const row of contactRows){row.checkbox.checked=ids.has(row.id);if(row.checkbox.checked)selected.set(row.id,row.name);}
+    const missing=data.recipients.filter(id=>!contactRows.some(row=>row.id===id)).length;
+    status.textContent=missing ? 'Projekt geladen. '+missing+' zugeordnete Empfänger fehlen in der Kontaktliste.' : 'Projektzuordnung geladen.';
+  }));
+  async function updateProject(snap, isSelected) {
+    const project=projectKey(), ids=[...selected.keys()];
+    if(!ids.length){status.textContent='Bitte zuerst Empfänger auswählen.';return;}
+    for(const chatId of ids){if(!visible(snap))return;await call('batch_project_set',{project,chatId,selected:isSelected});}
+    if(visible(snap))status.textContent='Projektzuordnung aktualisiert. WhatsApp-Kontakte wurden nicht verändert.';
+  }
+  $('batch-project-add').addEventListener('click',()=>work(snap=>updateProject(snap,true)));
+  $('batch-project-remove').addEventListener('click',()=>work(snap=>updateProject(snap,false)));
   $('batch-load-jobs').addEventListener('click',()=>work(async snap=>{
     historyCursor=null; await loadHistory(snap);
   }));
@@ -84,7 +108,7 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
     status.textContent=result.stopped?'Versand angehalten. Bitte Status pro Empfänger prüfen.':'Versandlauf verarbeitet. Annahme ist keine Zustellbestätigung.';
   }));
   $('batch-cancel').addEventListener('click',resetReview);
-  function clearSession() { epoch++; selected.clear(); activeBatch=null; historyCursor=null; contactRows=[]; search.value=''; resetReview(); message.value=''; preview.textContent=''; $('batch-preview-recipients').replaceChildren(); list.replaceChildren(); jobs.replaceChildren(); results.replaceChildren(); status.textContent=''; }
+  function clearSession() { epoch++; selected.clear(); activeBatch=null; historyCursor=null; contactRows=[]; search.value=''; $('batch-project').value=''; resetReview(); message.value=''; preview.textContent=''; $('batch-preview-recipients').replaceChildren(); list.replaceChildren(); jobs.replaceChildren(); results.replaceChildren(); status.textContent=''; }
   $('logout').addEventListener('click',clearSession);
   window.addEventListener('web-kit-admin-authenticated',clearSession);
 }
