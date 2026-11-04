@@ -78,5 +78,7 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
     status.textContent=result.stopped?'Versand angehalten. Bitte Status pro Empfänger prüfen.':'Versandlauf verarbeitet. Annahme ist keine Zustellbestätigung.';
   }));
   $('batch-cancel').addEventListener('click',resetReview);
-  $('logout').addEventListener('click',()=>{epoch++;selected.clear();activeBatch=null;resetReview();message.value='';preview.textContent='';list.replaceChildren();jobs.replaceChildren();results.replaceChildren();status.textContent='';});
+  function clearSession() { epoch++; selected.clear(); activeBatch=null; historyCursor=null; resetReview(); message.value=''; preview.textContent=''; $('batch-preview-recipients').replaceChildren(); list.replaceChildren(); jobs.replaceChildren(); results.replaceChildren(); status.textContent=''; }
+  $('logout').addEventListener('click',clearSession);
+  window.addEventListener('web-kit-admin-authenticated',clearSession);
 }
