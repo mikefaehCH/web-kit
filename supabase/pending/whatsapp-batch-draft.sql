@@ -233,4 +233,21 @@ revoke all on function public.web_kit_whatsapp_project_set_recipient(uuid,text,t
 grant execute on function public.web_kit_whatsapp_project_recipients(uuid,text) to service_role;
 grant execute on function public.web_kit_whatsapp_project_set_recipient(uuid,text,text,boolean) to service_role;
 
+
+create function public.web_kit_whatsapp_projects(p_actor uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare result jsonb;
+begin
+  if coalesce(auth.role(),'') <> 'service_role' or not exists (
+    select 1 from auth.users u where u.id=p_actor and u.deleted_at is null
+      and (u.banned_until is null or u.banned_until <= now())
+      and u.raw_app_meta_data->>'web_kit_admin'='true'
+  ) then raise exception 'forbidden' using errcode='42501'; end if;
+  select coalesce(jsonb_agg(project_slug order by project_slug),'[]'::jsonb) into result
+    from (select distinct project_slug from public.web_kit_wa_recipient_projects where actor_id=p_actor) projects;
+  return result;
+end $$;
+revoke all on function public.web_kit_whatsapp_projects(uuid) from public, anon, authenticated;
+grant execute on function public.web_kit_whatsapp_projects(uuid) to service_role;
+
 commit;
