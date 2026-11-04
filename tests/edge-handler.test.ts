@@ -289,3 +289,10 @@ test("unbekannte Aktion wird vor Claim und Versand blockiert", async () => {
   assert.equal((await handle(req({ ...ok, action: "unknown" }), t.deps)).status, 400);
   assert.equal(t.rpc.length + t.fetches.length, 0);
 });
+
+test("unfertige Batch-Erstellung wird vor Datenbank und Provider abgewiesen", async () => {
+  const t=setup();
+  const res=await handle(req({action:"create_batch",batchId:"aaaaaaaa-1111-4111-8111-111111111111",message:"Hi",recipients:["41790000000@c.us"]}),t.deps);
+  assert.equal(res.status,400);
+  assert.equal(t.rpc.length+t.fetches.length,0);
+});
