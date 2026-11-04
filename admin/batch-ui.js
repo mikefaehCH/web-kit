@@ -10,15 +10,15 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
   function resetReview() { reviewed = null; $('batch-review').hidden = true; }
   async function call(action, payload = {}) {
     const token = await window.WEB_KIT_GET_ACCESS_TOKEN();
-    if (!token) throw new Error('Logga in igen.');
+    if (!token) throw new Error('Bitte erneut anmelden.');
     const response = await fetch(window.WEB_KIT_WHATSAPP_ENDPOINT, { method:'POST', cache:'no-store', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token, apikey:'sb_publishable_Qeom38G18vSgrrE5MxoXEw_LhJM1f6S' }, body:JSON.stringify({action,...payload}) });
-    if (!response.ok) throw new Error('Åtgärden kunde inte bekräftas. Kontrollera status innan du försöker igen.');
+    if (!response.ok) throw new Error('Die Aktion konnte nicht bestätigt werden. Prüfe den Status, bevor du es erneut versuchst.');
     return response.json();
   }
   async function work(fn) {
     if (busy) return;
     busy = true; const snapshot = epoch; ui.setAttribute('aria-busy','true');
-    try { await fn(snapshot); } catch { if (snapshot === epoch) status.textContent = 'Åtgärden kunde inte bekräftas. Lade listan igen och prüfe den betroffenen Auftrag.'; }
+    try { await fn(snapshot); } catch { if (snapshot === epoch) status.textContent = 'Die Aktion konnte nicht bestätigt werden. Lade die Liste erneut und prüfe den betroffenen Auftrag.'; }
     finally { busy = false; ui.removeAttribute('aria-busy'); }
   }
   function visible(snapshot) { return snapshot === epoch; }
