@@ -116,6 +116,13 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
         if (before != null && (typeof before !== "string" || !UUID_V4.test(before))) return json({ error: "Invalid cursor" }, 400);
         return json({ batches: await store.list({ actorId: user.id, before: typeof before === "string" ? before.toLowerCase() : null }) });
       }
+      if (action === "batch_projects_list") {
+        const result=await deps.serviceRpc("web_kit_whatsapp_projects",{p_actor:user.id});
+        if(result.error || !Array.isArray(result.data) || result.data.length>1000 ||
+           result.data.some(project=>typeof project!=="string" || !/^[a-z0-9][a-z0-9-]{0,47}$/.test(project)))
+          return json({error:"Projects unavailable"},503);
+        return json({projects:result.data});
+      }
       if (action === "batch_project_list" || action === "batch_project_set") {
         if (typeof project !== "string" || !/^[a-z0-9][a-z0-9-]{0,47}$/.test(project)) return json({ error: "Invalid project" }, 400);
         if (action === "batch_project_list") {
