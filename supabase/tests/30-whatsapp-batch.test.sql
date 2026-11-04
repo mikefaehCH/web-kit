@@ -3,6 +3,8 @@ insert into auth.users(id,raw_app_meta_data) values
  ('aaaaaaaa-1111-4111-8111-111111111111','{"web_kit_admin":true}'),
  ('bbbbbbbb-1111-4111-8111-111111111111','{"web_kit_admin":true}');
 insert into public.web_kit_wa_batches(id,actor_id,message_hash) values ('aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-1111-4111-8111-111111111111',repeat('a',64));
+insert into public.web_kit_wa_batches(id,actor_id,message_hash) values ('aaaaaaaa-2222-4222-8222-222222222224','aaaaaaaa-1111-4111-8111-111111111111',repeat('c',64));
+insert into public.web_kit_wa_batch_items(id,batch_id,request_key,position,chat_id,status,claimed_at) values ('aaaaaaaa-3333-4333-8333-333333333335','aaaaaaaa-2222-4222-8222-222222222224','aaaaaaaa-4444-4444-8444-444444444445',1,'41790000004@c.us','pending',now()-interval '6 minutes');
 insert into public.web_kit_wa_batch_items(id,batch_id,request_key,position,chat_id) values
  ('aaaaaaaa-3333-4333-8333-333333333331','aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-4444-4444-8444-444444444441',1,'41790000000@c.us'),
  ('aaaaaaaa-3333-4333-8333-333333333332','aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-4444-4444-8444-444444444442',2,'41790000001@c.us');
@@ -36,6 +38,9 @@ begin
  assert not (r->'items'->0 ? 'request_key');
  r:=public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64)); assert r->>'state'='claimed'; assert (r->>'item_id')::uuid=i;
  assert public.web_kit_whatsapp_batch_claim(b,a,repeat('a',64))->>'state'='blocked';
+ assert not public.web_kit_whatsapp_batch_resolve(b,a,i,true);
+ assert public.web_kit_whatsapp_batch_resolve('aaaaaaaa-2222-4222-8222-222222222224',a,'aaaaaaaa-3333-4333-8333-333333333335',true);
+ assert public.web_kit_whatsapp_batch_claim('aaaaaaaa-2222-4222-8222-222222222224',a,repeat('c',64))->>'state'='complete';
  assert not public.web_kit_whatsapp_batch_finish(b,a,i,k,'accepted',null);
  assert public.web_kit_whatsapp_batch_finish(b,a,i,k,'unknown',null);
  assert not public.web_kit_whatsapp_batch_finish(b,a,i,k,'accepted','FAKE');
