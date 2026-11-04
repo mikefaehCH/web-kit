@@ -9,8 +9,8 @@ export function createBatchStore(rpc) {
     return result.data;
   }
   return {
-    async claimNext({ batchId, actorId }) {
-      const data = await invoke('web_kit_whatsapp_batch_claim', { p_batch: batchId, p_actor: actorId });
+    async claimNext({ batchId, actorId, messageHash }) {
+      const data = await invoke('web_kit_whatsapp_batch_claim', { p_batch: batchId, p_actor: actorId, p_message_hash: messageHash });
       if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid batch claim');
       if (data.state === 'complete') return null;
       if (data.state === 'blocked') return { blocked: true };

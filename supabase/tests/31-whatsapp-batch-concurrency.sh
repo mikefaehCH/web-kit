@@ -14,7 +14,7 @@ for n in 1 2; do
 select set_config('request.jwt.claim.role','service_role',false);
 set role service_role;
 begin;
-select public.web_kit_whatsapp_batch_claim('aaaaaaaa-2222-4222-8222-222222222223','aaaaaaaa-1111-4111-8111-111111111111')->>'state';
+select public.web_kit_whatsapp_batch_claim('aaaaaaaa-2222-4222-8222-222222222223','aaaaaaaa-1111-4111-8111-111111111111',repeat('b',64))->>'state';
 select pg_sleep(1);
 commit;
 SQL

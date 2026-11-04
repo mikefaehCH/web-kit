@@ -1,13 +1,14 @@
 // The store must implement claimNext atomically and durably. A claimed item
 // is never reclaimed automatically: the provider might already have accepted it.
-export async function runBatch({ store, batchId, actorId, send }) {
+export async function runBatch({ store, batchId, actorId, messageHash, send }) {
   if (!store || typeof store.claimNext !== 'function' || typeof store.finish !== 'function' || typeof send !== 'function') throw new TypeError('Invalid batch dependencies');
   if (typeof batchId !== 'string' || !batchId || typeof actorId !== 'string' || !actorId) throw new TypeError('Batch and actor are required');
+  if (typeof messageHash !== 'string' || !/^[0-9a-f]{64}$/.test(messageHash)) throw new TypeError('Message hash required');
   let processed = 0;
   while (true) {
     // claimNext checks ownership and atomically refuses claims while any item
     // in this batch is pending or unknown, including after a worker crash.
-    const item = await store.claimNext({ batchId, actorId });
+    const item = await store.claimNext({ batchId, actorId, messageHash });
     if (item === null) return { processed, stopped: false };
     if (item?.blocked === true) return { processed, stopped: true, reason: 'blocked' };
     if (!item || typeof item.id !== 'string' || typeof item.requestKey !== 'string') throw new Error('Invalid claim');

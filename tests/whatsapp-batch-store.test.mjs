@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBatchStore } from '../supabase/functions/web-kit-whatsapp-send/batch-store.mjs';
-const args={batchId:'batch',actorId:'owner'};
+const args={batchId:'batch',actorId:'owner',messageHash:'a'.repeat(64)};
 test('claim translates complete, blocked and claimed states', async()=>{
   for (const [data, expected] of [[{state:'complete'},null],[{state:'blocked'},{blocked:true}],[{state:'claimed',item_id:'item',request_key:'key',chat_id:'contact'},{id:'item',requestKey:'key',chatId:'contact'}]]) {
     let call; const store=createBatchStore(async(name, params)=>{call={name,params};return {data,error:null};});
     assert.deepEqual(await store.claimNext(args),expected);
-    assert.deepEqual(call,{name:'web_kit_whatsapp_batch_claim',params:{p_batch:'batch',p_actor:'owner'}});
+    assert.deepEqual(call,{name:'web_kit_whatsapp_batch_claim',params:{p_batch:'batch',p_actor:'owner',p_message_hash:'a'.repeat(64)}});
   }
 });
 test('database error and malformed claim fail closed without leaking details',async()=>{
