@@ -23,7 +23,7 @@ function setup(enabled, history=[], failInspect=false){
     if(req.action==='batch_inspect')data={items:[{id:'i',chatId:'41790000000@c.us',status:'accepted',reviewAvailable:false}]};
     return {ok:!(failInspect && req.action==='batch_inspect'),json:async()=>data};};
   vm.runInNewContext(fs.readFileSync('admin/batch-ui.js','utf8'),{window,document,fetch,crypto:{randomUUID:()=> 'aaaaaaaa-1111-4111-8111-111111111111'}});
-  return {nodes,actions,document,events};
+  return {nodes,actions,document,events,window};
 }
 test('feature stays hidden by default',()=>{const t=setup(false);assert.equal(t.document.getElementById('batch-ui').hidden,true);assert.equal(t.actions.length,0);});
 test('preview required before creation and one simulated send',async()=>{
@@ -71,4 +71,15 @@ test('authentication refresh clears selected contacts and message before another
   t.events['web-kit-admin-authenticated']();
   assert.equal(el('batch-message').value,'');assert.equal(el('batch-review').hidden,true);assert.equal(el('batch-contacts').children.length,0);
   await el('batch-confirm').fire('click');assert.ok(!t.actions.some(a=>a.action==='batch_send'));
+});
+
+test('logout while obtaining a token prevents the pending network request',async()=>{
+  const t=setup(true), el=id=>t.document.getElementById(id);
+  await el('batch-load-contacts').fire('click');
+  const check=el('batch-contacts').children[0].children[0].children[0];check.checked=true;check.fire('change');
+  el('batch-message').value='Hallo';el('batch-review-button').fire('click');
+  let release; t.window.WEB_KIT_GET_ACCESS_TOKEN=()=>new Promise(resolve=>{release=resolve;});
+  const pending=el('batch-confirm').fire('click');
+  el('logout').fire('click');release('fake');await pending;
+  assert.deepEqual(t.actions.map(a=>a.action),['list_contacts']);
 });
