@@ -11,7 +11,7 @@ insert into public.web_kit_wa_batch_items(id,batch_id,request_key,position,chat_
  ('aaaaaaaa-3333-4333-8333-333333333331','aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-4444-4444-8444-444444444441',1,'41790000000@c.us'),
  ('aaaaaaaa-3333-4333-8333-333333333332','aaaaaaaa-2222-4222-8222-222222222222','aaaaaaaa-4444-4444-8444-444444444442',2,'41790000001@c.us');
 do $$ begin
- assert not has_function_privilege('authenticated','public.web_kit_whatsapp_batch_list(uuid)','execute');
+ assert not has_function_privilege('authenticated','public.web_kit_whatsapp_batch_list(uuid,uuid)','execute');
  assert not has_function_privilege('authenticated','public.web_kit_whatsapp_batch_resolve(uuid,uuid,uuid,boolean)','execute');
  assert not has_function_privilege('anon','public.web_kit_whatsapp_batch_inspect(uuid,uuid)','execute');
  assert not has_function_privilege('authenticated','public.web_kit_whatsapp_batch_inspect(uuid,uuid)','execute');
