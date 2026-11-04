@@ -13,7 +13,8 @@ class Element {
 function setup(enabled, history=[], failInspect=false){
   const nodes=new Map(), actions=[];
   const document={getElementById(id){if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},createElement(){return new Element();},createTextNode(text){return {text};}};
-  const window={WEB_KIT_WHATSAPP_BATCH_UI_ENABLED:enabled,WEB_KIT_GET_ACCESS_TOKEN:async()=>'fake',WEB_KIT_WHATSAPP_ENDPOINT:'https://example.invalid',confirm:()=>true};
+  const events={};
+  const window={addEventListener:(name,fn)=>{events[name]=fn;},WEB_KIT_WHATSAPP_BATCH_UI_ENABLED:enabled,WEB_KIT_GET_ACCESS_TOKEN:async()=>'fake',WEB_KIT_WHATSAPP_ENDPOINT:'https://example.invalid',confirm:()=>true};
   const fetch=async(_url,init)=>{const req=JSON.parse(init.body);actions.push(req);let data={};
     if(req.action==='batch_list')data={batches:req.before ? history.slice(20) : history.slice(0,20)};
     if(req.action==='list_contacts')data={contacts:[{id:'41790000000@c.us',name:'Test'}]};
@@ -22,7 +23,7 @@ function setup(enabled, history=[], failInspect=false){
     if(req.action==='batch_inspect')data={items:[{id:'i',chatId:'41790000000@c.us',status:'accepted',reviewAvailable:false}]};
     return {ok:!(failInspect && req.action==='batch_inspect'),json:async()=>data};};
   vm.runInNewContext(fs.readFileSync('admin/batch-ui.js','utf8'),{window,document,fetch,crypto:{randomUUID:()=> 'aaaaaaaa-1111-4111-8111-111111111111'}});
-  return {nodes,actions,document};
+  return {nodes,actions,document,events};
 }
 test('feature stays hidden by default',()=>{const t=setup(false);assert.equal(t.document.getElementById('batch-ui').hidden,true);assert.equal(t.actions.length,0);});
 test('preview required before creation and one simulated send',async()=>{
@@ -59,4 +60,15 @@ test('failed status lookup cannot authorise resumption of that batch',async()=>{
   assert.equal(el('batch-review').hidden,true);
   await el('batch-confirm').fire('click');
   assert.ok(!t.actions.some(a=>a.action==='batch_send'));
+});
+
+test('authentication refresh clears selected contacts and message before another session',async()=>{
+  const t=setup(true),el=id=>t.document.getElementById(id);
+  await el('batch-load-contacts').fire('click');
+  const check=el('batch-contacts').children[0].children[0].children[0];check.checked=true;check.fire('change');
+  el('batch-message').value='Private Nachricht';el('batch-review-button').fire('click');
+  assert.equal(el('batch-review').hidden,false);
+  t.events['web-kit-admin-authenticated']();
+  assert.equal(el('batch-message').value,'');assert.equal(el('batch-review').hidden,true);assert.equal(el('batch-contacts').children.length,0);
+  await el('batch-confirm').fire('click');assert.ok(!t.actions.some(a=>a.action==='batch_send'));
 });
