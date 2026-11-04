@@ -4,7 +4,7 @@ import { runBatch } from '../supabase/functions/web-kit-whatsapp-send/batch.mjs'
 
 function memoryStore() {
   const items = ['a','b'].map(id => ({ id, requestKey: `key-${id}`, status: 'queued' }));
-  return { items, async claimNext({actorId}) { if (actorId !== 'owner') throw Error('forbidden'); if (items.some(x => x.status === 'pending' || x.status === 'unknown')) return null; const item = items.find(x => x.status === 'queued'); if (!item) return null; item.status = 'pending'; return { ...item }; }, async finish({itemId, outcome}) { const item = items.find(x => x.id === itemId); if (item.status !== 'pending') return false; item.status = outcome.status; return true; } };
+  return { items, async claimNext({actorId}) { if (actorId !== 'owner') throw Error('forbidden'); if (items.some(x => x.status === 'pending' || x.status === 'unknown')) return {blocked:true}; const item = items.find(x => x.status === 'queued'); if (!item) return null; item.status = 'pending'; return { ...item }; }, async finish({itemId, outcome}) { const item = items.find(x => x.id === itemId); if (item.status !== 'pending') return false; item.status = outcome.status; return true; } };
 }
 const input = store => ({ store, batchId:'batch', actorId:'owner' });
 test('two workers cannot dispatch the same batch concurrently', async () => {
@@ -20,7 +20,8 @@ test('ambiguous response stops; pending and unknown are never automatically recl
   assert.equal(first.reason,'unknown');
   assert.deepEqual(store.items.map(x=>x.status), ['unknown','queued']);
   // Recovery requires explicit resolution, never a retry of unknown.
-  await runBatch({...input(store),send:async x=>{sent.push(x.id); return {status:'accepted'};}});
+  const resumed=await runBatch({...input(store),send:async x=>{sent.push(x.id); return {status:'accepted'};}});
+  assert.equal(resumed.reason,'blocked');
   assert.deepEqual(sent,['a']);
 });
 test('audit failure stops processing and leaves the claim pending', async () => {
