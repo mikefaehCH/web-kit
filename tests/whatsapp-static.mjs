@@ -78,6 +78,9 @@ assert.match(render,/frame-ancestors 'none'/);
 assert.match(render,/name: Cache-Control/);
 assert.match(render,/value: no-store/);
 assert.match(render,/script-src 'self';/);
+// Nur die eigene Origin und die beiden bestehenden API-Ziele erlauben.
+const connect = render.match(/connect-src ([^;]+);/)?.[1].split(/\s+/).sort();
+assert.deepEqual(connect, ["'self'", 'https://api.github.com', 'https://qoensghjemruqafrbmjd.supabase.co'].sort());
 assert.doesNotMatch(render,/esm\.sh/);
 assert.match(auth,/from '\.\/vendor\/supabase\.js'/);
 assert.doesNotMatch(auth,/https:\/\/esm\.sh/);
