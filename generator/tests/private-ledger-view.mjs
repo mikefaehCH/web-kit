@@ -113,3 +113,15 @@ test('Snapshot einer anderen Reise wird nicht angezeigt', async () => {
   assert.match(root.find('p').textContent, /nicht eindeutig/);
   assert.equal(root.find('h3'), undefined, 'keine fremde Reise gerendert');
 });
+
+test('Fehlgeschlagener Reisewechsel stellt bestätigte Auswahl wieder her', async () => {
+  const root = new Node('div'); const s = fakeStore();
+  const original = s.store.getTripSnapshot;
+  s.store.getTripSnapshot = id => id === 'trip-b' ? Promise.reject(new Error('Verbindung fehlgeschlagen')) : original(id);
+  mountPrivateLedger(root, {store:s.store, ledger, backup}); await flush();
+  const select = root.find('select'); select.value = 'trip-a'; select.dispatch('change'); await flush(); s.answer('trip-a'); await flush();
+  select.value = 'trip-b'; select.dispatch('change'); await flush(); await flush();
+  assert.equal(select.value, 'trip-a');
+  assert.ok(root.find('h3', 'Reise A'));
+  assert.match(root.find('p').textContent, /Verbindung fehlgeschlagen/);
+});
