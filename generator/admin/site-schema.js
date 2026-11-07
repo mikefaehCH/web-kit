@@ -6,6 +6,19 @@ export const SITE_MODES = Object.freeze({
   hybrid: 'Website mit App-Bereich',
   app: 'Persönliche App',
 });
+export const PLANNER_FIELD_TYPES = Object.freeze(['text', 'date', 'number']);
+export function validatePlannerFields(fields) {
+  if (!Array.isArray(fields) || fields.length > 5) throw Error('Höchstens fünf Zusatzfelder sind möglich');
+  const ids = new Set();
+  return Object.freeze(fields.map(field => {
+    keys(field, ['id', 'label', 'type']);
+    const id = text(field.id, 32, 'Feld-ID');
+    if (!SLUG.test(id) || ids.has(id) || !PLANNER_FIELD_TYPES.includes(field.type))
+      throw Error('Ungültiges oder doppeltes Zusatzfeld');
+    ids.add(id);
+    return Object.freeze({ id, label: text(field.label, 50, 'Feldname'), type: field.type });
+  }));
+}
 export const CATEGORIES = Object.freeze(CATEGORY_REGISTRY.map((item) => item.id));
 const object = (value) => value && typeof value === 'object' && !Array.isArray(value);
 const keys = (value, allowed) => {
@@ -73,6 +86,7 @@ export function validateSite(input, catalog = CATEGORY_REGISTRY) {
     'locale',
     'modules',
     'content',
+    'plannerFields',
   ]);
   const { version, category, preset, id, color, locale, modules, content } = source;
   const mode = source.mode === undefined ? 'website' : source.mode;
@@ -146,8 +160,11 @@ export function validateSite(input, catalog = CATEGORY_REGISTRY) {
     });
     normalized = { sections: Object.freeze(sections) };
   }
+  const plannerFields = source.plannerFields === undefined ? [] : validatePlannerFields(source.plannerFields);
+  if (plannerFields.length && mode === 'website') throw Error('Zusatzfelder benötigen einen Planer');
   return Object.freeze({
     version: 2,
+    ...(plannerFields.length ? { plannerFields } : {}),
     ...(mode === 'website' ? {} : { mode }),
     category,
     preset,
@@ -171,6 +188,7 @@ export function makeSite({
   locale = 'de-CH',
   modules = {},
   content,
+  plannerFields,
   start,
   end,
 } = {}) {
@@ -181,6 +199,7 @@ export function makeSite({
   const definition = CATEGORY_REGISTRY.find((item) => item.id === category);
   return validateSite({
     version: 2,
+    ...(plannerFields === undefined ? {} : { plannerFields }),
     mode,
     category,
     preset: preset ?? definition?.presets[0].id,
@@ -205,7 +224,7 @@ export function makeSite({
 export function makeSiteFromBrief(brief) {
   keys(brief, [
     'purpose', 'audience', 'mode', 'title', 'id', 'color', 'locale',
-    'category', 'preset', 'modules', 'content',
+    'category', 'preset', 'modules', 'content', 'plannerFields',
   ]);
   const purpose = text(brief.purpose, 500, 'Zweck');
   const audience = text(brief.audience, 300, 'Zielgruppe');
@@ -242,6 +261,7 @@ export function makeSiteFromBrief(brief) {
     color: brief.color,
     locale: brief.locale,
     modules: brief.modules,
+    plannerFields: brief.plannerFields,
     content: brief.content ?? defaultContent,
   });
 }

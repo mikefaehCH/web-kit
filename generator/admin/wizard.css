@@ -150,3 +150,11 @@ input[type='checkbox'] {
 input[type='file'] {
   margin-block: 12px;
 }
+
+#ki-entwurf { margin-block: 1rem; }
+#ki-entwurf > summary { cursor: pointer; font-weight: 700; }
+#ki-entwurf [hidden] { display: none; }
+.wk-ai-preview { border: 1px solid currentColor; border-radius: .75rem; padding: 1rem; margin-block: 1rem; }
+.wk-ai-preview header h1 { font-size: 1.5rem; }
+.wk-ai-preview #planner-list { overflow-wrap: anywhere; }
+.wk-ai-preview #planner-list button { margin: .25rem; }

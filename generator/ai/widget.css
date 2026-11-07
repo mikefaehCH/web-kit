@@ -1,0 +1,17 @@
+.wk-assistant {
+  display: block;
+  padding: clamp(.85rem, 3vw, 1.4rem);
+  margin-block: 1rem;
+  color: var(--wk-ai-text, inherit);
+  background: var(--wk-ai-background, transparent);
+  border: 1px solid var(--wk-ai-border, currentColor);
+  border-radius: var(--wk-ai-radius, .8rem);
+  overflow-wrap: anywhere;
+}
+.wk-assistant h2 { margin-block: 0 .35rem; }
+.wk-assistant textarea { display: block; box-sizing: border-box; width: 100%; font: inherit; }
+.wk-assistant .wk-ai-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .65rem; }
+.wk-assistant button { min-height: 44px; font: inherit; white-space: normal; }
+.wk-assistant :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.wk-assistant [role="status"]:empty { display: none; }
+.wk-assistant [role="status"] { margin-block: .4rem; }

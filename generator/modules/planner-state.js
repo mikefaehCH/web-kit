@@ -15,7 +15,15 @@ export function validateEntry(entry) {
     typeof entry.kind !== 'string' || !Object.hasOwn(ENTRY_KINDS, entry.kind) ||
     typeof entry.done !== 'boolean'
   ) throw Error('Ungültiger Eintrag');
-  return { id: entry.id, title: entry.title.trim(), kind: entry.kind, done: entry.done };
+  const normalized = { id: entry.id, title: entry.title.trim(), kind: entry.kind, done: entry.done };
+  if (entry.values === undefined) return normalized;
+  const values = entry.values;
+  if (!values || typeof values !== 'object' || Array.isArray(values) ||
+    Object.entries(values).some(([key, value]) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(key) ||
+      key.length > 32 || typeof value !== 'string' || value.length > 140))
+    throw Error('Ungültige Zusatzfelder im Eintrag');
+  if (Object.keys(values).length) normalized.values = { ...values };
+  return normalized;
 }
 
 function validateEntries(entries) {

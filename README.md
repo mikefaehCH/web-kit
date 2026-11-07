@@ -85,6 +85,12 @@ Einmal online öffnen und auf «Offline verfügbar» warten. Danach die
 installierte App im Flugmodus öffnen und einen Testeintrag speichern.
 Browser- und Gerätetests separat festhalten.
 
+## KI-Assistent einbetten
+
+Das KI-Modul lässt sich pro Seite konfigurieren. Die fiktiven Etappen
+(`generator/ai/etappe-1.html` und `etappe-2.html`) und der Wizard verwenden
+dieselbe Komponente. [Einbau und Live-Betrieb](docs/AI_MODULE.md).
+
 ## Entwicklungs- und Releaseprozess
 
 - Verbindliche Zusammenarbeit: [AGENTS.md](AGENTS.md).

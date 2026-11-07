@@ -1,0 +1,8 @@
+:root { font: 16px/1.5 system-ui, sans-serif; color: #202e27; background: #f7f7ef; }
+body { margin: 0 auto; max-width: 46rem; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2 { line-height: 1.12; }
+h1 { font-size: clamp(2rem, 6vw, 3.5rem); }
+a { color: #225643; }
+button { color: #152f25; background: #e2ecdf; border: 1px solid #617565; border-radius: .4rem; padding: .45rem .75rem; }
+.wk-assistant { --wk-ai-background: #fffefa; --wk-ai-border: #819286; }
+nav { display: flex; flex-wrap: wrap; gap: 1rem; }

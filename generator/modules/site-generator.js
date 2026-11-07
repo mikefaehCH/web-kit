@@ -29,10 +29,16 @@ export const TEMPLATE_FILES = Object.freeze([
   'modules/site-generator.js',
   'modules/zip.js',
   'modules/planner.js',
+  'modules/sections-renderer.js',
   'modules/planner-state.js',
   'admin/site-schema.js',
   'admin/index.html',
   'admin/wizard.js',
+  'admin/wizard-ai.js',
+  'admin/wizard-ai-settings.js',
+  'ai/widget.js',
+  'ai/widget.css',
+  'ai/wizard-contract.js',
   'admin/bootstrap.js',
   'admin/wizard.css',
   'scripts/create.mjs',
@@ -113,6 +119,10 @@ export function generateProject(input, templates) {
       ),
   );
   let worker = text('sw.js').replace(/  '\.\/trips\/(city|walking)\.js',\n/g, '');
+  if (!isTravel) worker = worker.replace("const CACHE = PREFIX + 'v3';", "const CACHE = PREFIX + 'v4';");
+  if (!isTravel && !withPlanner) {
+    worker = worker.replace("  './modules/state.js',", "  './modules/state.js',\n  './modules/sections-renderer.js',");
+  }
   if (withPlanner) {
     worker = worker
       .replace("const PREFIX = 'travel-shell:' + self.registration.scope + ':';",
@@ -120,7 +130,7 @@ export function generateProject(input, templates) {
       .replace(/const ASSETS = \[.*?\];/s, 'const ASSETS = ' + JSON.stringify([
         './', './index.html', './app.js', './config.js', './style.css', './manifest.webmanifest',
         './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png',
-        './modules/planner.js', './modules/planner-state.js',
+        './modules/planner.js', './modules/planner-state.js', './modules/sections-renderer.js',
       ], null, 2) + ';')
       .replace(
         "!response.headers.get('cache-control')?.includes('no-store')",

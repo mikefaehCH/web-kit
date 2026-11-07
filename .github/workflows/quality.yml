@@ -29,7 +29,9 @@ jobs:
         with:
           node-version: '22'
       - name: Test versioned generator and CLI demo end to end
-        run: npm --prefix generator test
+        run: |
+          npm --prefix generator test
+          node --test ai/endpoint.test.mjs
       - name: Install browser test tools
         run: |
           npm --prefix generator/tests/browser ci --ignore-scripts
