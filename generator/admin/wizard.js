@@ -179,13 +179,13 @@ function refresh() {
       : site.content.sections.length + ' Abschnitte';
     preview.append(contentSummary);
     const sections = site.content.sections;
-    const modules = Object.entries(site.modules)
-      .filter(([, active]) => active)
-      .map(([name]) => name);
+    const modules = MODULES.filter((name) => site.modules[name]).map((name) =>
+      form.elements.namedItem(name).labels[0].textContent.trim(),
+    );
     const navigation = sections
       ? sections.map((section) => section.heading)
       : [
-          'Entdecken',
+          ...(site.modules.places ? ['Entdecken'] : []),
           ...(site.modules.map ? ['Karte'] : []),
           ...(site.modules.planning ? ['Mein Plan'] : []),
         ];
