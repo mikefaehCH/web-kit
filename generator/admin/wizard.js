@@ -1,4 +1,4 @@
-import { mountWizardAi } from './wizard-ai.js';
+import { mountWizardAi } from './wizard-ai.js?v=20261107-ai-preview';
 import { makeSite, validateSite, MODULES, CATEGORY_REGISTRY, SITE_MODES } from './site-schema.js';
 import { generateProject, loadBrowserTemplates } from '../modules/site-generator.js';
 import { createZip } from '../modules/zip.js';
@@ -10,6 +10,7 @@ const download = document.querySelector('#download');
 const create = document.querySelector('#create');
 let busy = false;
 let revision = 0;
+let aiPreview;
 const categorySelect = form.elements.namedItem('category');
 const modeSelect = form.elements.namedItem('mode');
 for (const [mode, label] of Object.entries(SITE_MODES)) modeSelect.add(new Option(label, mode));
@@ -171,6 +172,7 @@ function refresh() {
     });
   }
   revision++;
+  aiPreview?.markStale();
   valid = null;
   download.disabled = true;
   create.disabled = true;
@@ -236,10 +238,14 @@ function refresh() {
 }
 form.addEventListener('input', refresh);
 form.addEventListener('change', refresh);
-form.addEventListener('submit', (event) => {
+form.addEventListener('submit', async (event) => {
   event.preventDefault();
+  const startedAt = revision;
   try {
-    valid = config();
+    const site = config();
+    await aiPreview?.sync(site, startedAt);
+    if (revision !== startedAt) return;
+    valid = site;
     download.disabled = false;
     create.disabled = busy;
     message.textContent = 'Konfiguration gültig. Du kannst site.json herunterladen.';
@@ -349,7 +355,7 @@ document.querySelector('#site-import').addEventListener('change', async (event) 
   }
 });
 refresh();
-mountWizardAi({
+aiPreview = mountWizardAi({
   read: () => {
     try { return config(); } catch { return null; }
   },

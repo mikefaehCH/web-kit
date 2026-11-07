@@ -36,7 +36,7 @@ async function demoRequest(question, draft) {
       proposal: { brief: null, fields: [trainingField] },
     };
   }
-  return { answer: 'Diese Demo unterstützt die beiden Beispielaufträge. Starte mit dem Padel-Auftrag.' };
+  return { answer: 'Die lokale Demo unterstützt den Padel-Beispielablauf. Für einen anderen Entwurf nutze das manuelle Formular unter dem Assistenten.' };
 }
 
 export function mountWizardAi({ read, load, capture, restore, revision }) {
@@ -45,10 +45,12 @@ export function mountWizardAi({ read, load, capture, restore, revision }) {
   const preview = root.querySelector('[data-ai-preview]');
   const undo = root.querySelector('[data-ai-undo]');
   const status = root.querySelector('[data-ai-status]');
+  const previewState = root.querySelector('[data-ai-preview-state]');
   const liveRequest = liveSettings ? createAssistantRequest(liveSettings) : null;
   let active = false;
   let previous = null;
   let appliedAt;
+  let previewRevision;
   let template;
 
   async function buildPreview(site) {
@@ -72,6 +74,13 @@ export function mountWizardAi({ read, load, capture, restore, revision }) {
     return content;
   }
 
+  function showPreview(rendered) {
+    preview.replaceChildren(...(rendered ? [rendered] : []));
+    previewRevision = revision();
+    previewState.textContent = rendered ? 'Interaktive Vorschau entspricht der aktuellen Konfiguration.'
+      : active ? 'Für diese Kategorie steht die kompakte Wizard-Vorschau bereit.' : '';
+  }
+
   undo.addEventListener('click', async () => {
     if (undo.disabled || revision() !== appliedAt) {
       status.textContent = 'Der Entwurf wurde inzwischen manuell geändert.';
@@ -83,7 +92,7 @@ export function mountWizardAi({ read, load, capture, restore, revision }) {
       if (revision() !== appliedAt) throw Error('Der Entwurf wurde inzwischen manuell geändert.');
       restore(previous.form);
       active = previous.active;
-      preview.replaceChildren(...(rendered ? [rendered] : []));
+      showPreview(rendered);
       status.textContent = 'Letzten KI-Vorschlag rückgängig gemacht.';
     } catch (error) {
       status.textContent = error.message;
@@ -118,10 +127,27 @@ export function mountWizardAi({ read, load, capture, restore, revision }) {
       load(site);
       active = true;
       appliedAt = revision();
-      preview.replaceChildren(rendered);
+      showPreview(rendered);
       undo.disabled = false;
-      status.textContent = 'Vorschau des zuletzt übernommenen KI-Entwurfs. Der Export verwendet die aktuellen Wizard-Eingaben.';
+      status.textContent = '';
     },
   });
   if (liveRequest) root.querySelector('[data-ai-consent]').parentElement.hidden = false;
+
+  return {
+    markStale() {
+      if (active && previewRevision !== revision())
+        previewState.textContent = 'Interaktive Vorschau zeigt den letzten geprüften Stand. Wähle «Konfiguration prüfen», um sie zu aktualisieren.';
+    },
+    async sync(site, startedAt) {
+      if (!active || previewRevision === startedAt) return;
+      try {
+        const rendered = await buildPreview(site);
+        if (revision() === startedAt) showPreview(rendered);
+      } catch {
+        if (revision() === startedAt)
+          previewState.textContent = 'Interaktive Vorschau konnte nicht aktualisiert werden. Der Export verwendet die geprüfte Konfiguration.';
+      }
+    },
+  };
 }

@@ -171,6 +171,8 @@ try {
     assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'BUTTON');
     await assistant.getByRole('button', { name: 'Senden' }).click();
     await assistant.getByText(/endet in Birkenhafen/).waitFor();
+    await assistant.getByText(/keine GPX-Datei zum Download/).waitFor();
+    assert.match(await assistant.getByRole('link', { name: 'Etappenübersicht' }).getAttribute('href'), /etappe-1.html#etappeninfo$/);
     const route = assistant.getByRole('link', { name: 'Route und GPX' });
     assert.match(await route.getAttribute('href'), /etappe-1.html#gpx$/);
     await question.fill('Wie weit ist es bis dort?');
@@ -181,13 +183,22 @@ try {
     await assistant.getByRole('button', { name: 'Senden' }).click();
     await assistant.getByText(/endet in Lindenbrück/).waitFor();
     assert.match(await route.getAttribute('href'), /etappe-2.html#gpx$/);
-    await question.fill('Gibt es am Ziel ein Hotel?');
+    await question.fill('Wie heisst der Zielort?');
+    await assistant.getByRole('button', { name: 'Senden' }).click();
+    await assistant.getByText(/endet in Lindenbrück/).waitFor();
+    assert.match(await assistant.getByRole('link', { name: 'Etappenübersicht' }).getAttribute('href'), /etappe-2.html#etappeninfo$/);
+    assert.equal(await route.count(), 0);
+    await question.fill('Kann ich die Hotelliste als Datei herunterladen?');
     await assistant.getByRole('button', { name: 'Senden' }).click();
     await assistant.getByText(/keine freigegebene Angabe/).waitFor();
+    assert.equal(await assistant.getByRole('link').count(), 0);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
 
     await page.getByRole('link', { name: 'Wizard-Demo' }).click();
     const preview = page.locator('[data-ai-preview]');
+    await question.fill('Ich brauche eine Übersicht für unser Material mit Zustand und Anzahl.');
+    await assistant.getByRole('button', { name: 'Senden' }).click();
+    await assistant.getByText(/manuelle Formular unter dem Assistenten/).waitFor();
     const propose = async name => {
       await assistant.getByRole('button', { name }).click();
       await assistant.getByRole('button', { name: 'Senden' }).click();
@@ -215,11 +226,19 @@ try {
     await preview.getByText('Trainingsart · Technik').waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
     await page.getByRole('button', { name: 'Konfiguration prüfen' }).click();
+    await page.locator('#wizard input[name=title]').fill('Padel-Tagebuch');
+    await page.getByText(/Interaktive Vorschau zeigt den letzten geprüften Stand/).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Website erstellen' }).isEnabled(), false);
+    await page.getByRole('button', { name: 'Konfiguration prüfen' }).click();
+    await preview.getByRole('heading', { name: 'Padel-Tagebuch' }).waitFor();
+    await preview.getByText('Trainingsart · Technik').waitFor();
+    assert.equal(await preview.getByRole('heading', { name: 'Aufschlag geübt' }).count(), 1);
     const aiDownload = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Website erstellen' }).click();
     const aiArchive = await (await aiDownload).path();
     const aiSite = JSON.parse(execFileSync('unzip', ['-p', aiArchive, 'site.json']));
     assert.equal(aiSite.mode, 'app');
+    assert.equal(aiSite.title, 'Padel-Tagebuch');
     assert.equal(aiSite.plannerFields.at(-1).id, 'trainingsart');
     assert.doesNotMatch(JSON.stringify(aiSite), /Aufschlag geübt/);
 
