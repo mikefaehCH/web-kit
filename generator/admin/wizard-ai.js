@@ -1,5 +1,6 @@
 import { mountAssistant, createAssistantRequest } from '../ai/widget.js';
 import { applyWizardProposal } from '../ai/wizard-contract.js';
+import { COLLECTION_PROFILE } from '../modules/planner-profiles.js';
 import { renderSections } from '../modules/sections-renderer.js';
 import liveSettings from './wizard-ai-settings.js';
 
@@ -11,11 +12,25 @@ const initialFields = [
 const trainingField = { id: 'trainingsart', label: 'Trainingsart', type: 'text' };
 const examples = [
   'Ich möchte meine Padel-Trainings erfassen.',
+  'Ich möchte meine Bücher sammeln und wiederfinden.',
   'Ergänze die Trainingsart.',
 ];
 
 async function demoRequest(question, draft) {
   const prompt = question.toLowerCase();
+  if (!draft && /bücher/.test(prompt) && /sammel|wiederfind/.test(prompt)) {
+    return {
+      answer: 'Eine persönliche Büchersammlung mit Kategorie, Notiz, Suche und Filter.',
+      proposal: {
+        brief: {
+          title: 'Meine Büchersammlung',
+          purpose: 'Bücher sammeln und wiederfinden.',
+          plannerProfile: COLLECTION_PROFILE,
+        },
+        fields: [],
+      },
+    };
+  }
   if (!draft && prompt.includes('padel')) {
     return {
       answer: 'Eine persönliche App mit Datum, Dauer und Notiz. Nach der Übernahme kannst du ein Training erfassen.',
@@ -36,7 +51,7 @@ async function demoRequest(question, draft) {
       proposal: { brief: null, fields: [trainingField] },
     };
   }
-  return { answer: 'Diese Demo unterstützt die beiden Beispielaufträge. Starte mit dem Padel-Auftrag.' };
+  return { answer: 'Starte in dieser lokalen Demo mit dem Padel- oder Bücher-Beispiel.' };
 }
 
 export function mountWizardAi({ read, load, capture, restore, revision }) {
