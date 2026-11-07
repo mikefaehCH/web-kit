@@ -215,3 +215,17 @@ footer {
 .info-page section p {
   white-space: pre-wrap;
 }
+
+.info-page #section-navigation {
+  gap: 8px 16px;
+  margin-top: 16px;
+}
+.info-page #section-navigation a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  max-width: 100%;
+  padding-inline: 8px;
+  color: var(--ink);
+  border-bottom: 2px solid var(--accent);
+}

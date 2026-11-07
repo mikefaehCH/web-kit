@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeSite as makeBaseSite, validateSite } from '../admin/site-schema.js';
+import { makeSite as makeBaseSite, makeSiteFromBrief, validateSite } from '../admin/site-schema.js';
 const makeSite = (options = {}) =>
   makeBaseSite({ start: '2027-06-01', end: '2027-06-03', ...options });
 test('wizard creates a deterministic site.json schema', () => {
@@ -64,4 +64,27 @@ test('boundaries, versions and malformed values are rejected', () => {
     validateSite(JSON.parse(JSON.stringify(base).replace('{', '{"__proto__":{"x":1},'))),
   );
   assert.throws(() => validateSite(null));
+});
+
+test('Kurzbriefing akzeptiert Gestaltung und validierte Reisebausteine', () => {
+  const purpose = 'Ausflug planen';
+  const audience = 'Familien';
+  const site = makeSiteFromBrief({
+    purpose, audience,
+    title: 'Ein Tag am See',
+    color: '#005A69',
+    category: 'travel',
+    preset: 'walking',
+    modules: { map: false, offline: false },
+    content: { start: '2027-06-19', end: '2027-06-19', places: [] },
+  });
+  assert.equal(site.id, 'ein-tag-am-see');
+  assert.equal(site.color, '#005a69');
+  assert.equal(site.preset, 'walking');
+  assert.equal(site.modules.places, true);
+  assert.equal(site.modules.map, false);
+  assert.equal(site.modules.offline, false);
+  assert.throws(() => makeSiteFromBrief({ purpose, audience, category: 'travel' }), /Datum/);
+  assert.throws(() => makeSiteFromBrief({ purpose, audience, modules: { map: true } }), /Module/);
+  assert.throws(() => makeSiteFromBrief({ purpose, audience, title: 42 }), /Titel/);
 });
