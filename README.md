@@ -11,6 +11,28 @@ node generator/scripts/create.mjs generator/examples/demo-site.json /tmp/web-kit
 
 Die Implementierung wird ausschliesslich über Pull Requests ergänzt.
 
+## Neue Website aus einem Kurzbriefing
+
+Ein kurzer Auftrag mit Zweck und Zielgruppe genügt für eine lokale Vorschau.
+Aus dem Auftrag ein JSON mit `purpose` und `audience` erstellen. Für eine
+passendere erste Fassung können ein kurzer `title`, eine passende Akzentfarbe
+als `color` sowie relevante Abschnitte unter `content.sections` ergänzt werden.
+Keine Termine, Adressen oder Angebote ohne Grundlage als Tatsachen ausgeben.
+
+```sh
+node generator/scripts/create.mjs --brief generator/examples/demo-brief.json /tmp/web-kit-vorschau
+npm --prefix /tmp/web-kit-vorschau test
+python3 -m http.server 8765 --bind 127.0.0.1 --directory /tmp/web-kit-vorschau
+```
+
+Die Vorschau ist danach lokal unter `http://127.0.0.1:8765/` erreichbar. Der
+Generator setzt Projekt-ID, Sprache, Vorlage und passende Module vor. Standard
+ist eine Infoseite auf Deutsch (Schweiz) mit Offline-Unterstützung. Für eine
+Reise `category: travel` mit bestätigtem Zeitraum und Orten im bestehenden
+Schema angeben. Die erzeugte `site.json` lässt sich zur weiteren Bearbeitung in
+den Wizard importieren. Der Zielordner muss neu sein. Der Ablauf legt lokal
+Dateien an. Eine Veröffentlichung erfolgt separat.
+
 ## Entwicklungs- und Releaseprozess
 
 - Verbindliche Zusammenarbeit: [AGENTS.md](AGENTS.md).

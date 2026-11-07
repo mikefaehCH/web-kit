@@ -186,3 +186,46 @@ export function makeSite({
       (definition?.contract === 'dated-places' ? { start, end, places: [] } : { sections: [] }),
   });
 }
+
+// A brief is a separate input format. Generated projects still use canonical site.json.
+export function makeSiteFromBrief(brief) {
+  keys(brief, [
+    'purpose', 'audience', 'title', 'id', 'color', 'locale',
+    'category', 'preset', 'modules', 'content',
+  ]);
+  const purpose = text(brief.purpose, 500, 'Zweck');
+  const audience = text(brief.audience, 300, 'Zielgruppe');
+  const title = brief.title === undefined
+    ? purpose.slice(0, 100).replace(/[\uD800-\uDBFF]$/, '').trimEnd()
+    : text(brief.title, 100, 'Titel');
+  if (brief.modules !== undefined) keys(brief.modules, MODULES);
+  const suggestedId = title
+    .toLowerCase()
+    .replace(/ß/g, 'ss')
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-/, '')
+    .slice(0, 64)
+    .replace(/-$/, '');
+  const category = brief.category ?? 'general';
+  const defaultContent = category === 'general'
+    ? {
+        sections: [
+          { heading: 'Überblick', text: purpose },
+          { heading: 'Für wen', text: audience },
+        ],
+      }
+    : undefined;
+  return makeSite({
+    category,
+    preset: brief.preset,
+    id: brief.id ?? (suggestedId || 'meine-website'),
+    title,
+    description: purpose,
+    color: brief.color,
+    locale: brief.locale,
+    modules: brief.modules,
+    content: brief.content ?? defaultContent,
+  });
+}

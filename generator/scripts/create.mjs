@@ -1,35 +1,66 @@
-import { cp, mkdir, readFile, writeFile, access } from 'node:fs/promises';
+import { cp, mkdir, readFile, writeFile, realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { resolve, relative, isAbsolute } from 'node:path';
+import { basename, dirname, resolve, relative, isAbsolute, sep } from 'node:path';
 import { trips } from '../config.js';
-import { validateSite } from '../admin/site-schema.js';
+import { makeSiteFromBrief, validateSite } from '../admin/site-schema.js';
 
-const [example, destination, projectId] = process.argv.slice(2);
-if (example?.endsWith('.json')) {
-  const { TEMPLATE_FILES, generateProject } = await import('../modules/site-generator.js');
-  const site = validateSite(JSON.parse(await readFile(example, 'utf8')));
-  if (!destination) throw Error('Ziel fehlt');
-  const source = fileURLToPath(new URL('../', import.meta.url));
+const [mode, input, output] = process.argv.slice(2);
+const brief = mode === '--brief';
+const example = brief ? input : mode;
+const destination = brief ? output : input;
+const projectId = output;
+const fromConfig = brief || example?.endsWith('.json');
+const source = fileURLToPath(new URL('../', import.meta.url));
+
+async function prepareTarget(destination) {
+  if (!destination) throw Error('Zielordner fehlt');
   const target = resolve(destination);
-  const rel = relative(source, target);
-  if (!rel || (!rel.startsWith('..') && !isAbsolute(rel)))
-    throw Error('Ziel darf nicht in der Vorlage liegen');
-  const templates = new Map(
-    await Promise.all(
-      TEMPLATE_FILES.map(async (path) => [
-        path,
-        new Uint8Array(await readFile(resolve(source, path))),
-      ]),
-    ),
+  const rel = relative(
+    await realpath(source),
+    resolve(await realpath(dirname(target)), basename(target)),
   );
-  const output = generateProject(site, templates);
-  await mkdir(target);
-  for (const [path, bytes] of output) {
-    await mkdir(resolve(target, path, '..'), { recursive: true });
-    await writeFile(resolve(target, path), bytes, { flag: 'wx' });
+  if (!rel || (rel !== '..' && !rel.startsWith('..' + sep) && !isAbsolute(rel)))
+    throw Error('Ziel darf nicht in der Vorlage liegen');
+  return target;
+}
+
+async function createTarget(target) {
+  try {
+    await mkdir(target);
+  } catch (error) {
+    if (error.code === 'EEXIST')
+      throw Error('Ziel existiert bereits; es wird nichts überschrieben: ' + target);
+    throw error;
   }
-  console.log('Website erstellt: ' + target);
-  process.exit(0);
+}
+
+if (fromConfig) {
+  try {
+    if (!example) throw Error('Kurzbriefing fehlt');
+    const parsed = JSON.parse(await readFile(example, 'utf8'));
+    const site = brief ? makeSiteFromBrief(parsed) : validateSite(parsed);
+    const { TEMPLATE_FILES, generateProject } = await import('../modules/site-generator.js');
+    const target = await prepareTarget(destination);
+    const templates = new Map(
+      await Promise.all(
+        TEMPLATE_FILES.map(async (path) => [
+          path,
+          new Uint8Array(await readFile(resolve(source, path))),
+        ]),
+      ),
+    );
+    const projectFiles = generateProject(site, templates);
+    await createTarget(target);
+    for (const [path, bytes] of projectFiles) {
+      await mkdir(resolve(target, path, '..'), { recursive: true });
+      await writeFile(resolve(target, path), bytes, { flag: 'wx' });
+    }
+    console.log('Website erstellt: ' + target);
+    process.exit(0);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
 }
 if (
   !Object.hasOwn(trips, example || '') ||
@@ -37,22 +68,12 @@ if (
   !destination
 ) {
   console.error(
-    'Aufruf: node scripts/create.mjs site.json /neuer/ordner (oder city|walking /neuer/ordner projekt-id)',
+    'Aufruf: node scripts/create.mjs [--brief] datei.json /neuer/ordner (oder city|walking /neuer/ordner projekt-id)',
   );
   process.exit(1);
 }
-const source = fileURLToPath(new URL('../', import.meta.url));
-const target = resolve(destination);
-const rel = relative(source, target);
-if (!rel || (!rel.startsWith('..') && !isAbsolute(rel)))
-  throw new Error('Ziel darf nicht in der Vorlage liegen');
-try {
-  await access(target);
-  throw new Error('Ziel existiert bereits; es wird nichts überschrieben');
-} catch (error) {
-  if (error.code !== 'ENOENT') throw error;
-}
-await mkdir(target);
+const target = await prepareTarget(destination);
+await createTarget(target);
 const files = [
   'admin',
   'categories',
