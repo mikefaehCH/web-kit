@@ -2,6 +2,8 @@ import { mountAssistant, createAssistantRequest } from '../ai/widget.js';
 import { applyWizardProposal } from '../ai/wizard-contract.js';
 import { COLLECTION_PROFILE } from '../modules/planner-profiles.js';
 import { renderSections } from '../modules/sections-renderer.js';
+import { makeSiteFromBrief } from './site-schema.js';
+import { briefFromSentence } from './quick-brief.js';
 import liveSettings from './wizard-ai-settings.js';
 
 const initialFields = [
@@ -108,7 +110,7 @@ export function mountWizardAi({ read, load, capture, restore, revision }) {
       restore(previous.form);
       active = previous.active;
       showPreview(rendered);
-      status.textContent = 'Letzten KI-Vorschlag rückgängig gemacht.';
+      status.textContent = 'Letzten Entwurf rückgängig gemacht.';
     } catch (error) {
       status.textContent = error.message;
       undo.disabled = false;
@@ -133,19 +135,37 @@ export function mountWizardAi({ read, load, capture, restore, revision }) {
       if (result.proposal) result.proposal = { change: result.proposal, current, form, draft, startedAt };
       return result;
     },
-    apply: async ({ change, current, form, draft, startedAt }) => {
-      if (revision() !== startedAt) throw Error('Der Entwurf wurde geändert. Bitte sende den Auftrag erneut.');
-      const site = applyWizardProposal(change, draft);
-      const rendered = await buildPreview(site);
-      if (revision() !== startedAt) throw Error('Der Entwurf wurde geändert. Bitte sende den Auftrag erneut.');
-      previous = { site: current, form, active };
-      load(site);
-      active = true;
-      appliedAt = revision();
-      showPreview(rendered);
-      undo.disabled = false;
-      status.textContent = '';
-    },
+    apply: ({ change, current, form, draft, startedAt }) =>
+      showDraft(applyWizardProposal(change, draft), current, form, startedAt),
+  });
+  async function showDraft(site, current, form, startedAt) {
+    if (revision() !== startedAt) throw Error('Der Entwurf wurde geändert. Bitte sende den Auftrag erneut.');
+    const rendered = await buildPreview(site);
+    if (revision() !== startedAt) throw Error('Der Entwurf wurde geändert. Bitte sende den Auftrag erneut.');
+    previous = { site: current, form, active };
+    load(site);
+    active = true;
+    appliedAt = revision();
+    showPreview(rendered);
+    undo.disabled = false;
+    status.textContent = '';
+  }
+  const quickForm = document.querySelector('#quick-brief');
+  const quickStatus = document.querySelector('#quick-status');
+  quickForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = quickForm.querySelector('button');
+    button.disabled = true;
+    try {
+      const site = makeSiteFromBrief(briefFromSentence(document.querySelector('#quick-sentence').value));
+      await showDraft(site, read(), capture(), revision());
+      quickStatus.textContent = 'Vorschau erstellt. Du kannst den Entwurf unten anpassen oder rückgängig machen.';
+      document.querySelector('[data-ai-preview]').scrollIntoView({ block: 'nearest' });
+    } catch (error) {
+      quickStatus.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
   });
   if (liveRequest) root.querySelector('[data-ai-consent]').parentElement.hidden = false;
 

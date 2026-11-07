@@ -22,12 +22,23 @@
           geprüfte site.json und erstellt deine Website als ZIP.
         </p>
       </header>
+      <section aria-labelledby="quick-title">
+        <h2 id="quick-title">Auftrag → Vorschau</h2>
+        <p>Ein Satz genügt für einen ersten Entwurf. Der Schnellstart ersetzt den aktuellen Entwurf und läuft lokal im Browser.</p>
+        <form id="quick-brief">
+          <label for="quick-sentence">Was möchtest du erstellen?</label>
+          <textarea id="quick-sentence" required maxlength="500" rows="2"
+            placeholder="Ich möchte eine Website für meinen Sportverein."></textarea>
+          <button type="submit">Vorschau erstellen</button>
+        </form>
+        <p id="quick-status" role="status"></p>
+      </section>
       <details id="ki-entwurf" open>
         <summary>KI-Assistent</summary>
         <div data-assistant></div>
         <label hidden><input type="checkbox" data-ai-consent /> Zusatzfeld-Konfiguration für Änderungen an OpenAI senden</label>
         <p data-ai-status role="status"></p>
-        <button data-ai-undo type="button" disabled>KI-Änderung rückgängig</button>
+        <button data-ai-undo type="button" disabled>Entwurf rückgängig</button>
         <p data-ai-preview-state role="status"></p>
         <div data-ai-preview></div>
       </details>
@@ -117,6 +128,6 @@
         selben Webserver geladen. Kein Login und keine Veröffentlichung.
       </p>
     </main>
-    <script type="module" src="./bootstrap.js?v=20261107-collection-preview"></script>
+    <script type="module" src="./bootstrap.js?v=20261107-quick-brief"></script>
   </body>
 </html>
