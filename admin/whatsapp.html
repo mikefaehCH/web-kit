@@ -14,18 +14,20 @@
     <section id="login-panel" aria-labelledby="login-title">
       <p class="eyebrow">Persönlicher, geschützter Bereich</p>
       <h1 id="login-title">Administration</h1>
-      <p>Mit deinem Admin-Benutzernamen (E-Mail-Adresse) und Passwort anmelden.</p>
-      <form id="login-form">
-        <label for="email">Benutzername (E-Mail-Adresse)</label>
-        <input id="email" type="email" autocomplete="username" required placeholder="name@beispiel.ch">
-        <label for="password">Passwort</label>
-        <input id="password" type="password" autocomplete="current-password" required>
-        <button type="submit">Anmelden</button>
-      </form>
-      <button id="reset-password" type="button" class="text-button">Passwort zurücksetzen</button>
+      <div id="password-step">
+        <p>Mit deinem Admin-Benutzernamen (E-Mail-Adresse) und Passwort anmelden.</p>
+        <form id="login-form">
+          <label for="email">Benutzername (E-Mail-Adresse)</label>
+          <input id="email" type="email" autocomplete="username" required placeholder="name@beispiel.ch">
+          <label for="password">Passwort</label>
+          <input id="password" type="password" autocomplete="current-password" required>
+          <button type="submit">Anmelden</button>
+        </form>
+        <button id="reset-password" type="button" class="text-button">Passwort zurücksetzen</button>
+      </div>
       <p id="login-status" role="status" aria-live="polite"></p>
       <section id="mfa-panel" aria-labelledby="mfa-title" hidden>
-        <h2 id="mfa-title">Zwei-Faktor-Anmeldung</h2>
+        <h2 id="mfa-title">Anmeldung bestätigen</h2>
         <p id="mfa-instructions"></p>
         <button id="mfa-enroll" type="button" hidden>Authenticator einrichten</button>
         <div id="mfa-enrollment" hidden>
@@ -37,10 +39,12 @@
           <label for="mfa-factor" hidden>Authenticator</label>
           <select id="mfa-factor" hidden></select>
           <label for="mfa-code">6-stelliger Authenticator-Code</label>
-          <input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required>
+          <input id="mfa-code" aria-describedby="mfa-instructions" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required>
           <button type="submit">Code prüfen</button>
         </form>
-        <button id="mfa-cancel" type="button" class="secondary" hidden>Abbrechen</button>
+        <p id="mfa-status" role="status"></p>
+        <button id="mfa-cancel" type="button" class="secondary" hidden>Einrichtung abbrechen</button>
+        <button id="mfa-switch-account" type="button" class="text-button">Konto wechseln</button>
       </section>
       <form id="recovery-form" hidden>
         <h2>Neues Passwort festlegen</h2>
