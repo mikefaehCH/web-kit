@@ -1,3 +1,4 @@
+import { COLLECTION_PROFILE, plannerFieldsFor, plannerLabel } from '../modules/planner-profiles.js';
 import { mountWizardAi } from './wizard-ai.js';
 import { makeSite, validateSite, MODULES, CATEGORY_REGISTRY, SITE_MODES } from './site-schema.js';
 import { generateProject, loadBrowserTemplates } from '../modules/site-generator.js';
@@ -12,6 +13,7 @@ let busy = false;
 let revision = 0;
 const categorySelect = form.elements.namedItem('category');
 const modeSelect = form.elements.namedItem('mode');
+const profileSelect = form.elements.namedItem('plannerProfile');
 for (const [mode, label] of Object.entries(SITE_MODES)) modeSelect.add(new Option(label, mode));
 const presetSelect = form.elements.namedItem('preset');
 const placesEditor = document.querySelector('#places-editor');
@@ -27,6 +29,8 @@ function syncCategory(preset, resetModules = false) {
   const travel = category.contract === 'dated-places';
   if (travel) modeSelect.value = 'website';
   modeSelect.disabled = travel;
+  profileSelect.disabled = travel || modeSelect.value === 'website';
+  profileSelect.closest('label').hidden = profileSelect.disabled;
   const showSections = !travel && modeSelect.value !== 'app';
   for (const selector of ['[data-travel-only]', '[data-general-only]']) {
     for (const section of document.querySelectorAll(selector)) {
@@ -152,7 +156,8 @@ function config() {
     description: values.get('description'),
     color: values.get('color'),
     modules,
-    plannerFields: ['app', 'hybrid'].includes(modeSelect.value) ? plannerFields : [],
+    plannerFields: profileSelect.disabled ? [] : plannerFields,
+    plannerProfile: profileSelect.disabled ? undefined : profileSelect.value || undefined,
   });
 }
 function refresh() {
@@ -210,9 +215,17 @@ function refresh() {
           ...(site.modules.planning ? ['Mein Plan'] : []),
         ];
     if (site.mode) {
-      if (site.mode === 'hybrid') navigation.push('Mein Planer');
-      else navigation.push('Eintrag erfassen', 'Einträge filtern', 'Daten sichern');
-      modules.push('Lokaler Ideen- und Aufgabenplaner');
+      const collection = site.plannerProfile === COLLECTION_PROFILE;
+      if (site.mode === 'hybrid') navigation.push(plannerLabel(site.plannerProfile));
+      else navigation.push('Eintrag erfassen', collection ? 'Suchen und filtern' : 'Einträge filtern', 'Daten sichern');
+      modules.push(collection ? 'Lokale Sammlung' : 'Lokaler Ideen- und Aufgabenplaner');
+      const fields = document.createElement('p');
+      fields.textContent = ['Titel', ...(collection ? [] : ['Art']),
+        ...plannerFieldsFor(site.plannerProfile, site.plannerFields).map(field => field.label)].join(' · ');
+      preview.append(fields);
+      const requirements = document.createElement('p');
+      requirements.textContent = 'Voraussetzungen: Browserspeicher sowie localhost oder HTTPS für Offline-Nutzung.';
+      preview.append(requirements);
     }
     for (const [label, values] of [
       ['Startseite und Bereiche', navigation],
@@ -287,7 +300,7 @@ create.addEventListener('click', async () => {
     create.disabled = !valid;
   }
 });
-const snapshotKeys = ['category', 'preset', 'mode', 'id', 'title', 'description', 'color', 'locale', 'start', 'end'];
+const snapshotKeys = ['category', 'preset', 'mode', 'plannerProfile', 'id', 'title', 'description', 'color', 'locale', 'start', 'end'];
 function snapshotForm() {
   return {
     fields: Object.fromEntries(snapshotKeys.map(key => [key, form.elements.namedItem(key).value])),
@@ -317,6 +330,7 @@ function loadSite(site) {
       ...Object.fromEntries(['id', 'title', 'description', 'color', 'locale', 'category', 'preset']
         .map(key => [key, site[key]])),
       mode: site.mode ?? 'website',
+      plannerProfile: site.plannerProfile ?? '',
       start: site.content.start ?? '',
       end: site.content.end ?? '',
     },

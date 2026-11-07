@@ -37,6 +37,12 @@
       <form id="wizard">
         <label>Kategorie<select name="category"></select></label>
         <label>Modus<select name="mode"></select></label>
+        <label data-planner-only hidden>App-Profil
+          <select name="plannerProfile" disabled>
+            <option value="">Ideen und Aufgaben</option>
+            <option value="collection">Persönliche Sammlung</option>
+          </select>
+        </label>
         <label>Vorlage<select name="preset"></select></label>
         <label
           >Projekt-ID<input
@@ -110,6 +116,6 @@
         selben Webserver geladen. Kein Login und keine Veröffentlichung.
       </p>
     </main>
-    <script type="module" src="./bootstrap.js?v=20261107-ai"></script>
+    <script type="module" src="./bootstrap.js?v=20261107-collection"></script>
   </body>
 </html>

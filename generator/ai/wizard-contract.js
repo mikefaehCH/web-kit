@@ -4,8 +4,8 @@ export function applyWizardProposal(proposal, draft) {
   const fields = validatePlannerFields(proposal.fields);
   if (proposal.brief) {
     if (draft) throw Error('Dieser Vorschlag würde den bestehenden Entwurf ersetzen.');
-    const { title, purpose, audience, mode } = proposal.brief;
-    return makeSiteFromBrief({ title, purpose, audience, mode, plannerFields: fields });
+    const { title, purpose, audience, mode, plannerProfile } = proposal.brief;
+    return makeSiteFromBrief({ title, purpose, audience, mode, plannerProfile, plannerFields: fields });
   }
   if (!draft?.mode || !fields.length) throw Error('Für Zusatzfelder ist ein bestehender Planer nötig.');
   const current = validateSite(draft);

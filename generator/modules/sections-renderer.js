@@ -1,3 +1,5 @@
+import { plannerFieldsFor, plannerLabel } from './planner-profiles.js';
+
 export function renderSections(root, site, { scope } = {}) {
   root.querySelector('#title').textContent = site.title;
   root.querySelector('#description').textContent = site.description;
@@ -25,7 +27,7 @@ export function renderSections(root, site, { scope } = {}) {
   if (hybrid) {
     const link = document.createElement('a');
     link.href = '#planner';
-    link.textContent = 'Mein Planer';
+    link.textContent = plannerLabel(site.plannerProfile);
     navigation.append(link);
   }
   navigation.hidden = !showNavigation;
@@ -33,7 +35,11 @@ export function renderSections(root, site, { scope } = {}) {
     const planner = root.querySelector('#planner');
     planner.hidden = false;
     return import('./planner.js')
-      .then(({ mountPlanner }) => mountPlanner(planner, site.id, { fields: site.plannerFields, scope }))
+      .then(({ mountPlanner }) => mountPlanner(planner, site.id, {
+        fields: plannerFieldsFor(site.plannerProfile, site.plannerFields),
+        profile: site.plannerProfile,
+        scope,
+      }))
       .catch(() => {
         planner.querySelector('#planner-status').textContent = 'Der Planer konnte nicht geladen werden.';
       });

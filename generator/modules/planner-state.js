@@ -3,8 +3,8 @@ export const MAX_BACKUP_BYTES = 1000000;
 export const MAX_ENTRIES = 1000;
 export const ENTRY_KINDS = Object.freeze({ idea: 'Idee', task: 'Aufgabe' });
 
-export function plannerKey(projectId, scope = new URL('.', location.href).pathname) {
-  return 'web-kit-planner:' + scope + ':' + projectId;
+export function plannerKey(projectId, scope = new URL('.', location.href).pathname, profile) {
+  return 'web-kit-planner:' + scope + ':' + projectId + (profile ? ':' + profile : '');
 }
 
 export function validateEntry(entry) {
@@ -35,11 +35,11 @@ function validateEntries(entries) {
   return normalized;
 }
 
-export function exportPlanner(projectId, entries) {
-  return JSON.stringify({ format: FORMAT, projectId, entries: validateEntries(entries) }, null, 2);
+export function exportPlanner(projectId, entries, profile) {
+  return JSON.stringify({ format: FORMAT, projectId, profile, entries: validateEntries(entries) }, null, 2);
 }
 
-export function importPlanner(text, projectId) {
+export function importPlanner(text, projectId, profile) {
   if (new TextEncoder().encode(text).length > MAX_BACKUP_BYTES) throw Error('Backup ist zu gross');
   let backup;
   try {
@@ -49,13 +49,14 @@ export function importPlanner(text, projectId) {
   }
   if (backup?.format !== FORMAT || backup.projectId !== projectId)
     throw Error('Backup gehört zu einem anderen Projekt oder hat ein unbekanntes Format');
+  if (backup.profile !== profile) throw Error('Backup gehört zu einem anderen App-Profil');
   return validateEntries(backup.entries);
 }
 
 // A single read/write transaction serializes changes across tabs and preserves the old state on error.
-export function openPlanner(projectId, scope) {
+export function openPlanner(projectId, scope, profile) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(plannerKey(projectId, scope), 1);
+    const request = indexedDB.open(plannerKey(projectId, scope, profile), 1);
     request.onupgradeneeded = () => request.result.createObjectStore('planner');
     request.onerror = () => reject(Error('Lokaler Speicher ist nicht verfügbar'));
     request.onsuccess = () => {

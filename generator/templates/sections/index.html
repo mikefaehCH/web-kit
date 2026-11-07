@@ -29,7 +29,7 @@
         <h2 id="planner-heading">Mein Planer</h2>
         <form>
           <fieldset disabled>
-            <legend>Idee oder Aufgabe</legend>
+            <legend id="planner-editor-label">Idee oder Aufgabe</legend>
             <label>Titel <input name="title" maxlength="140" required /></label>
             <label>Art
               <select name="kind">
@@ -46,7 +46,10 @@
         <p id="planner-status" role="status"></p>
         <fieldset disabled>
           <legend>Einträge</legend>
-          <label>Filter
+          <label hidden>Suche
+            <input id="planner-search" type="search" placeholder="Titel, Kategorie oder Notiz" />
+          </label>
+          <label><span id="planner-filter-label">Filter</span>
             <select id="planner-filter">
               <option value="all">Alle</option>
               <option value="open">Offen</option>
