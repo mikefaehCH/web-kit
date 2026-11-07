@@ -1,3 +1,4 @@
+import { mountWizardAi } from './wizard-ai.js';
 import { makeSite, validateSite, MODULES, CATEGORY_REGISTRY, SITE_MODES } from './site-schema.js';
 import { generateProject, loadBrowserTemplates } from '../modules/site-generator.js';
 import { createZip } from '../modules/zip.js';
@@ -124,6 +125,7 @@ document.querySelector('#add-section').addEventListener('click', () => {
 });
 syncCategory();
 let valid = null;
+let plannerFields = [];
 function config() {
   const values = new FormData(form);
   const modules = Object.fromEntries(MODULES.map((name) => [name, values.has(name)]));
@@ -150,6 +152,7 @@ function config() {
     description: values.get('description'),
     color: values.get('color'),
     modules,
+    plannerFields: ['app', 'hybrid'].includes(modeSelect.value) ? plannerFields : [],
   });
 }
 function refresh() {
@@ -284,6 +287,47 @@ create.addEventListener('click', async () => {
     create.disabled = !valid;
   }
 });
+const snapshotKeys = ['category', 'preset', 'mode', 'id', 'title', 'description', 'color', 'locale', 'start', 'end'];
+function snapshotForm() {
+  return {
+    fields: Object.fromEntries(snapshotKeys.map(key => [key, form.elements.namedItem(key).value])),
+    modules: Object.fromEntries(MODULES.map(key => [key, form.elements.namedItem(key).checked])),
+    places: readRows(placesEditor),
+    sections: readRows(sectionsEditor),
+    plannerFields,
+  };
+}
+function restoreForm(snapshot) {
+  categorySelect.value = snapshot.fields.category;
+  syncCategory(snapshot.fields.preset);
+  for (const [key, value] of Object.entries(snapshot.fields)) form.elements.namedItem(key).value = value;
+  for (const [key, value] of Object.entries(snapshot.modules)) form.elements.namedItem(key).checked = value;
+  plannerFields = snapshot.plannerFields;
+  placesEditor.replaceChildren();
+  sectionsEditor.replaceChildren();
+  placeNumber = 0;
+  for (const { lat, lon, ...place } of snapshot.places) addPlace({ ...place, coordinates: [lat, lon] });
+  for (const section of snapshot.sections) addSection(section);
+  syncCategory(snapshot.fields.preset);
+  refresh();
+}
+function loadSite(site) {
+  restoreForm({
+    fields: {
+      ...Object.fromEntries(['id', 'title', 'description', 'color', 'locale', 'category', 'preset']
+        .map(key => [key, site[key]])),
+      mode: site.mode ?? 'website',
+      start: site.content.start ?? '',
+      end: site.content.end ?? '',
+    },
+    modules: site.modules,
+    places: (site.content.places ?? []).map(({ coordinates, ...place }) => ({
+      ...place, lat: coordinates[0], lon: coordinates[1],
+    })),
+    sections: site.content.sections ?? [],
+    plannerFields: site.plannerFields ?? [],
+  });
+}
 document.querySelector('#site-import').addEventListener('change', async (event) => {
   const file = event.target.files[0];
   const startedAt = revision;
@@ -293,21 +337,7 @@ document.querySelector('#site-import').addEventListener('change', async (event) 
     const input = JSON.parse(await file.text());
     const site = validateSite(input);
     if (revision !== startedAt) throw Error('Entwurf während des Imports geändert');
-    categorySelect.value = site.category;
-    modeSelect.value = site.mode ?? 'website';
-    syncCategory(site.preset);
-    for (const key of ['id', 'title', 'description', 'color', 'locale'])
-      form.elements.namedItem(key).value = site[key];
-    for (const key of MODULES) form.elements.namedItem(key).checked = site.modules[key];
-    placesEditor.replaceChildren();
-    sectionsEditor.replaceChildren();
-    placeNumber = 0;
-    form.elements.namedItem('start').value = site.content.start ?? '';
-    form.elements.namedItem('end').value = site.content.end ?? '';
-    for (const place of site.content.places ?? []) addPlace(place);
-    for (const section of site.content.sections ?? []) addSection(section);
-    syncCategory(site.preset);
-    refresh();
+    loadSite(site);
     message.textContent =
       input.version === 1
         ? 'Version 1 nach Version 2 migriert. Bitte prüfen.'
@@ -319,3 +349,12 @@ document.querySelector('#site-import').addEventListener('change', async (event) 
   }
 });
 refresh();
+mountWizardAi({
+  read: () => {
+    try { return config(); } catch { return null; }
+  },
+  load: loadSite,
+  capture: snapshotForm,
+  restore: restoreForm,
+  revision: () => revision,
+});

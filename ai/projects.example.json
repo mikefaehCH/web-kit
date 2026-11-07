@@ -1,0 +1,30 @@
+{
+  "demo": {
+    "origins": ["https://www.example.com"],
+    "pages": {
+      "etappe-1": {
+        "kind": "page",
+        "sources": [
+          {
+            "id": "etappe-1-route",
+            "label": "Route und GPX",
+            "text": "Die fiktive Etappe endet in Birkenhafen und ist 14 km lang. Der GPX-Hinweis steht im Abschnitt Route und GPX.",
+            "url": "https://www.example.com/etappe-1.html#gpx"
+          }
+        ]
+      },
+      "etappe-2": {
+        "kind": "page",
+        "sources": [
+          {
+            "id": "etappe-2-route",
+            "label": "Route und GPX",
+            "text": "Die fiktive Etappe endet in Lindenbrück und ist 18 km lang. Der GPX-Hinweis steht im Abschnitt Route und GPX.",
+            "url": "https://www.example.com/etappe-2.html#gpx"
+          }
+        ]
+      },
+      "wizard": { "kind": "wizard", "shareDraft": true }
+    }
+  }
+}

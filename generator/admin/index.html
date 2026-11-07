@@ -10,6 +10,7 @@
     />
     <title>Website-Wizard – lokale Vorschau</title>
     <link rel="stylesheet" href="./wizard.css" />
+    <link rel="stylesheet" href="../ai/widget.css" />
   </head>
   <body>
     <main>
@@ -21,6 +22,14 @@
           geprüfte site.json und erstellt deine Website als ZIP.
         </p>
       </header>
+      <details id="ki-entwurf" open>
+        <summary>KI-Assistent</summary>
+        <div data-assistant></div>
+        <label hidden><input type="checkbox" data-ai-consent /> Zusatzfeld-Konfiguration für Änderungen an OpenAI senden</label>
+        <p data-ai-status role="status"></p>
+        <button data-ai-undo type="button" disabled>KI-Änderung rückgängig</button>
+        <div data-ai-preview></div>
+      </details>
       <label class="note"
         >site.json importieren (ersetzt den aktuellen Entwurf)
         <input type="file" id="site-import" accept=".json,application/json" />
@@ -101,6 +110,6 @@
         selben Webserver geladen. Kein Login und keine Veröffentlichung.
       </p>
     </main>
-    <script type="module" src="./bootstrap.js?v=20261107-app"></script>
+    <script type="module" src="./bootstrap.js?v=20261107-ai"></script>
   </body>
 </html>

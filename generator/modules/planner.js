@@ -2,7 +2,7 @@ import {
   ENTRY_KINDS, MAX_BACKUP_BYTES, exportPlanner, importPlanner, openPlanner,
 } from './planner-state.js';
 
-export async function mountPlanner(root, projectId) {
+export async function mountPlanner(root, projectId, { fields = [], scope } = {}) {
   const form = root.querySelector('form');
   const title = form.elements.namedItem('title');
   const kind = form.elements.namedItem('kind');
@@ -13,6 +13,17 @@ export async function mountPlanner(root, projectId) {
   const empty = root.querySelector('#planner-empty');
   const status = root.querySelector('#planner-status');
   const fileInput = root.querySelector('#planner-import');
+  const controls = fields.map(field => {
+    const label = document.createElement('label');
+    label.textContent = field.label;
+    const input = document.createElement('input');
+    input.type = field.type;
+    input.maxLength = 140;
+    if (field.type === 'number') input.step = 'any';
+    label.append(input);
+    save.parentElement.before(label);
+    return { ...field, input };
+  });
   const report = (text) => { status.textContent = text; };
   let entries = [];
   let editing = null;
@@ -29,6 +40,7 @@ export async function mountPlanner(root, projectId) {
     editing = entry;
     title.value = entry.title;
     kind.value = entry.kind;
+    for (const { id, input } of controls) input.value = entry.values && Object.hasOwn(entry.values, id) ? entry.values[id] : '';
     save.textContent = 'Änderungen speichern';
     cancel.hidden = false;
     title.focus();
@@ -64,7 +76,14 @@ export async function mountPlanner(root, projectId) {
         if (saved) filter.focus();
       });
       actions.append(edit, toggle);
-      item.append(badge, heading, actions);
+      item.append(badge, heading);
+      for (const { id, label } of controls) {
+        if (!entry.values || !Object.hasOwn(entry.values, id) || !entry.values[id]) continue;
+        const detail = document.createElement('p');
+        detail.textContent = label + ' · ' + entry.values[id];
+        item.append(detail);
+      }
+      item.append(actions);
       list.append(item);
     }
   }
@@ -82,7 +101,7 @@ export async function mountPlanner(root, projectId) {
   }
 
   try {
-    store = await openPlanner(projectId);
+    store = await openPlanner(projectId, scope);
     entries = await store.read();
   } catch (error) {
     report(error.message + '. Für diesen Browser können keine Einträge gespeichert werden.');
@@ -103,7 +122,12 @@ export async function mountPlanner(root, projectId) {
       return;
     }
     const previous = editing;
-    const fields = { title: entryTitle, kind: kind.value };
+    const values = { ...previous?.values };
+    for (const { id, input } of controls) {
+      if (input.value.trim()) values[id] = input.value.trim();
+      else delete values[id];
+    }
+    const fields = { title: entryTitle, kind: kind.value, values };
     save.disabled = true;
     const saved = await change(
       current => previous

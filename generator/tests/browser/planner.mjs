@@ -163,8 +163,68 @@ try {
       assert.match(execFileSync('unzip', ['-p', archive, 'index.html'], { encoding: 'utf8' }), /noindex,nofollow/);
     }
 
+    await page.goto(base + 'wizard/ai/etappe-1.html');
+    const assistant = page.locator('.wk-assistant');
+    const question = assistant.getByRole('textbox', { name: 'Deine Frage oder dein Auftrag' });
+    await question.fill('Wo endet die Etappe und wo ist die GPX-Datei?');
+    await question.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'BUTTON');
+    await assistant.getByRole('button', { name: 'Senden' }).click();
+    await assistant.getByText(/endet in Birkenhafen/).waitFor();
+    const route = assistant.getByRole('link', { name: 'Route und GPX' });
+    assert.match(await route.getAttribute('href'), /etappe-1.html#gpx$/);
+    await question.fill('Wie weit ist es bis dort?');
+    await assistant.getByRole('button', { name: 'Senden' }).click();
+    await assistant.getByText(/14 km lang/).waitFor();
+    await page.getByRole('link', { name: 'Etappe 2' }).click();
+    await assistant.getByRole('button', { name: /Wo endet die Etappe/ }).click();
+    await assistant.getByRole('button', { name: 'Senden' }).click();
+    await assistant.getByText(/endet in Lindenbrück/).waitFor();
+    assert.match(await route.getAttribute('href'), /etappe-2.html#gpx$/);
+    await question.fill('Gibt es am Ziel ein Hotel?');
+    await assistant.getByRole('button', { name: 'Senden' }).click();
+    await assistant.getByText(/keine freigegebene Angabe/).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+
+    await page.getByRole('link', { name: 'Wizard-Demo' }).click();
+    const preview = page.locator('[data-ai-preview]');
+    const propose = async name => {
+      await assistant.getByRole('button', { name }).click();
+      await assistant.getByRole('button', { name: 'Senden' }).click();
+      await assistant.getByRole('button', { name: 'Vorschlag übernehmen' }).click();
+    };
+    await propose('Ich möchte meine Padel-Trainings erfassen.');
+    await preview.getByRole('heading', { name: 'Padel-Trainings' }).waitFor();
+    await preview.getByRole('textbox', { name: 'Titel' }).fill('Aufschlag geübt');
+    await preview.getByLabel('Datum').fill('2026-11-07');
+    await preview.getByLabel('Dauer in Minuten').fill('75');
+    await preview.getByRole('button', { name: 'Eintrag erfassen' }).click();
+    await preview.getByRole('heading', { name: 'Aufschlag geübt' }).waitFor();
+
+    await propose('Ergänze die Trainingsart.');
+    await preview.getByLabel('Trainingsart').waitFor();
+    await preview.getByRole('heading', { name: 'Aufschlag geübt' }).waitFor();
+    await preview.getByRole('button', { name: 'Bearbeiten: Aufschlag geübt' }).click();
+    await preview.getByLabel('Trainingsart').fill('Technik');
+    await preview.getByRole('button', { name: 'Änderungen speichern' }).click();
+    await preview.getByText('Trainingsart · Technik').waitFor();
+    await page.getByRole('button', { name: 'KI-Änderung rückgängig' }).click();
+    await preview.getByLabel('Trainingsart').waitFor({ state: 'detached' });
+    await preview.getByRole('heading', { name: 'Aufschlag geübt' }).waitFor();
+    await propose('Ergänze die Trainingsart.');
+    await preview.getByText('Trainingsart · Technik').waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+    await page.getByRole('button', { name: 'Konfiguration prüfen' }).click();
+    const aiDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Website erstellen' }).click();
+    const aiArchive = await (await aiDownload).path();
+    const aiSite = JSON.parse(execFileSync('unzip', ['-p', aiArchive, 'site.json']));
+    assert.equal(aiSite.mode, 'app');
+    assert.equal(aiSite.plannerFields.at(-1).id, 'trainingsart');
+    assert.doesNotMatch(JSON.stringify(aiSite), /Aufschlag geübt/);
+
     assert.deepEqual(errors, []);
-    console.log(width + ' px: Planer, Backup, Offline und Speicherisolation bestanden.');
+    console.log(width + ' px: Planer, Backup, Offline, Speicherisolation und KI-Demos bestanden.');
     await profile.close();
   }
 } finally {
