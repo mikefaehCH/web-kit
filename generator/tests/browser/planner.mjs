@@ -291,7 +291,7 @@ try {
     await preview.getByLabel('Trainingsart').fill('Technik');
     await preview.getByRole('button', { name: 'Änderungen speichern' }).click();
     await preview.getByText('Trainingsart · Technik').waitFor();
-    await page.getByRole('button', { name: 'KI-Änderung rückgängig' }).click();
+    await page.getByRole('button', { name: 'Entwurf rückgängig' }).click();
     await preview.getByLabel('Trainingsart').waitFor({ state: 'detached' });
     await preview.getByRole('heading', { name: 'Aufschlag geübt' }).waitFor();
     await propose('Ergänze die Trainingsart.');
@@ -327,6 +327,20 @@ try {
     const collectionSite = JSON.parse(execFileSync('unzip', ['-p', collectionArchive, 'site.json']));
     assert.equal(collectionSite.plannerProfile, 'collection');
     assert.equal(collectionSite.mode, 'app');
+
+    const quick = page.getByLabel('Was möchtest du erstellen?');
+    await quick.fill('Ich möchte eine Website für meinen Sportverein.');
+    await page.getByRole('button', { name: 'Vorschau erstellen' }).click();
+    await preview.getByRole('link', { name: 'Kontakt' }).click();
+    await preview.getByRole('heading', { name: 'Kontakt' }).waitFor();
+    await quick.fill('Ich will meine Brettspiele sammeln und wiederfinden.');
+    await page.getByRole('button', { name: 'Vorschau erstellen' }).click();
+    await preview.getByRole('heading', { name: 'Meine Sammlung' }).waitFor();
+    await preview.getByRole('textbox', { name: 'Titel' }).fill('Fiktives Reisespiel');
+    await preview.getByRole('button', { name: 'Eintrag erfassen' }).click();
+    await preview.getByRole('heading', { name: 'Fiktives Reisespiel' }).waitFor();
+    await page.getByRole('button', { name: 'Entwurf rückgängig' }).click();
+    await preview.getByRole('link', { name: 'Kontakt' }).waitFor();
 
     assert.deepEqual(errors, []);
     console.log(width + ' px: Planer, Sammlung, Backup, Offline, Speicherisolation und KI-Demos bestanden.');

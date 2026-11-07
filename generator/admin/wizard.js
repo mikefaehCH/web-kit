@@ -1,5 +1,5 @@
 import { COLLECTION_PROFILE, plannerFieldsFor, plannerLabel } from '../modules/planner-profiles.js';
-import { mountWizardAi } from './wizard-ai.js?v=20261107-collection-preview';
+import { mountWizardAi } from './wizard-ai.js?v=20261107-quick-brief';
 import { makeSite, validateSite, MODULES, CATEGORY_REGISTRY, SITE_MODES } from './site-schema.js';
 import { generateProject, loadBrowserTemplates } from '../modules/site-generator.js';
 import { createZip } from '../modules/zip.js';
