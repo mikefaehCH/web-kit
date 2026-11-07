@@ -28,6 +28,8 @@ function statusLabel(state) {
   return ({ success: 'Grün geprüft', failure: 'Fehlgeschlagen', running: 'Läuft', unknown: 'Unbekannt' })[state] || 'Unbekannt';
 }
 
+const shortSha = sha => /^[0-9a-f]{40}$/i.test(sha ?? '') ? sha.slice(0, 7) : 'Unbekannt';
+
 function cardFor(data, deployment) {
   const { project, issues, workflow, error } = data;
   const card = document.createElement('article');
@@ -37,7 +39,10 @@ function cardFor(data, deployment) {
   card.append(title);
 
   const state = currentWorkflowState(workflow, data.mainSha);
-  const deployed = project.repo === 'web-kit' ? deploymentState(null, data.mainSha, deployment?.commit) : deploymentState(data.pages, data.mainSha, data.pages?.head_sha);
+  const deployedSha = project.repo === 'web-kit'
+    ? deployment?.commit
+    : workflowState(data.pages) === 'success' ? data.pages.head_sha : null;
+  const deployed = deploymentState(project.repo === 'web-kit' ? null : data.pages, data.mainSha, deployedSha);
   const workflowProblems = mainWorkflowAttention(data.runs, data.mainSha);
   const needsAttention = !Array.isArray(data.prAttention) || data.prAttention.length > 0 || state !== 'success' || workflowProblems === null || workflowProblems.length > 0 || deployed !== 'current' || !issues || Boolean(error) || Boolean(issues?.issues || issues?.pullRequests);
   card.dataset.failed = String(state === 'failure');
@@ -47,6 +52,16 @@ function cardFor(data, deployment) {
   badge.textContent = `Letzter Main-Workflow: ${statusLabel(state)}`;
   card.append(badge);
 
+  const release = document.createElement('p');
+  release.className = 'data-warning';
+  release.textContent = ({
+    current: 'Veröffentlicht · entspricht Main',
+    stale: 'Main ist weiter · Veröffentlichung prüfen',
+    failure: 'Letzte Veröffentlichung fehlgeschlagen',
+    unknown: 'Veröffentlichter Stand nicht bestätigt',
+  })[deployed];
+  card.append(release);
+
   const details = document.createElement('dl');
   const issueCounts = issues && issues.truncated
     ? { prs: `mind. ${issues.pullRequests}`, issues: `mind. ${issues.issues}` }
@@ -55,7 +70,8 @@ function cardFor(data, deployment) {
     ['Offene Pull Requests', issueCounts.prs],
     ['Offene Issues', issueCounts.issues],
     ['Commit im letzten Main-CI-Lauf', workflow?.head_sha && /^[0-9a-f]{40}$/i.test(workflow.head_sha) ? workflow.head_sha.slice(0, 7) : 'Unbekannt'],
-    ['Deployment-Stand', ({ current: 'Entspricht Main', stale: 'Weicht von Main ab', failure: 'Fehlgeschlagen', unknown: 'Unbekannt' })[deployed]],
+    ['Aktueller Main-Commit', shortSha(data.mainSha)],
+    ['Veröffentlichter Commit', shortSha(deployedSha)],
     ['Workflow-Zeit', workflow?.updated_at ? new Date(workflow.updated_at).toLocaleString('de-CH') : 'Unbekannt'],
   ];
   if (project.repo === 'web-kit') {
@@ -83,7 +99,10 @@ function cardFor(data, deployment) {
   links.append(link('Website', project.url), link('Repository', `https://github.com/mikefaehCH/${encodeURIComponent(project.repo)}`), link('Actions', `https://github.com/mikefaehCH/${encodeURIComponent(project.repo)}/actions`), link('Issues & PRs', `https://github.com/mikefaehCH/${encodeURIComponent(project.repo)}/issues`));
   if (workflow?.head_sha && /^[0-9a-f]{40}$/i.test(workflow.head_sha)) links.append(link('Commit', `https://github.com/mikefaehCH/${encodeURIComponent(project.repo)}/commit/${workflow.head_sha}`));
   if (workflow?.id && /^\d+$/.test(String(workflow.id))) links.append(link('Letzten CI-Lauf', `https://github.com/mikefaehCH/${encodeURIComponent(project.repo)}/actions/runs/${workflow.id}`));
-  if (project.hosting) links.append(link('Render', project.hosting));
+  if (project.hosting) links.append(link('Render-Veröffentlichung prüfen', project.hosting));
+  if (project.repo !== 'web-kit' && data.pages?.id && /^\d+$/.test(String(data.pages.id))) {
+    links.append(link('Pages-Veröffentlichung prüfen', `https://github.com/mikefaehCH/${encodeURIComponent(project.repo)}/actions/runs/${data.pages.id}`));
+  }
   card.append(links);
   return card;
 }

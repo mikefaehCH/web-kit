@@ -1,5 +1,5 @@
 export const PROJECTS = Object.freeze([
-  { name: 'Web-Kit', repo: 'web-kit', url: 'https://mikefaehch.github.io/web-kit/', hosting: 'https://dashboard.render.com/web/srv-dbkagf1srm7s739t6230' },
+  { name: 'Web-Kit', repo: 'web-kit', url: 'https://mikefaehch.github.io/web-kit/', hosting: 'https://dashboard.render.com/static/srv-dbkagf1srm7s739t6230' },
   { name: 'Sommer2027', repo: 'Sommer2027', url: 'https://mikefaehch.github.io/Sommer2027/' },
   { name: 'Camino', repo: 'camino', url: 'https://mikefaehch.github.io/camino/' },
   { name: 'Zuerich', repo: 'zuerich', url: 'https://mikefaehch.github.io/zuerich/' },

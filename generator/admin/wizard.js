@@ -178,8 +178,34 @@ function refresh() {
       ? site.content.places.length + ' Orte'
       : site.content.sections.length + ' Abschnitte';
     preview.append(contentSummary);
+    const sections = site.content.sections;
+    const modules = Object.entries(site.modules)
+      .filter(([, active]) => active)
+      .map(([name]) => name);
+    const navigation = sections
+      ? sections.map((section) => section.heading)
+      : [
+          'Entdecken',
+          ...(site.modules.map ? ['Karte'] : []),
+          ...(site.modules.planning ? ['Mein Plan'] : []),
+        ];
+    for (const [label, values] of [
+      ['Startseite und Bereiche', navigation],
+      ['Aktive Module', modules],
+    ]) {
+      const title = document.createElement('h4');
+      title.textContent = label;
+      const list = document.createElement('ul');
+      for (const text of values.length ? values : ['Keine ausgewählt']) {
+        const item = document.createElement('li');
+        item.textContent = text;
+        list.append(item);
+      }
+      preview.append(title, list);
+    }
     message.textContent = '';
   } catch (error) {
+    preview.textContent = 'Vorschau pausiert. Prüfe die Eingaben im Formular.';
     message.textContent = error.message;
   }
 }
