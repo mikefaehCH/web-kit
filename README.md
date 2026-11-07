@@ -22,6 +22,16 @@ Die Implementierung wird ausschliesslich über Pull Requests ergänzt.
 
 Das [Projektinventar](platform/projects.json) definiert den Startpunkt. Die [Arbeitsübersicht #12](https://github.com/mikefaehCH/web-kit/issues/12) koordiniert laufende Aufgaben. Stand, Übernahme und Abnahme stehen im jeweiligen Issue oder PR.
 
+### Ein Auftrag bis zur Produktion
+
+Mike gibt Ziel und Grenzen vor. Der Entwicklungslauf leitet daraus ein prüfbares Ergebnis ab, trifft reversible Detailentscheide und übernimmt auch die dafür nötigen kleinen Korrekturen. Für Routineverbesserungen an den bestehenden Abläufen in der Tabelle gilt der bereits freigegebene Rahmen.
+
+1. **Auswählen.** Zuerst Produktions- und Sicherheitsfehler, dann freigegebene Arbeiten mit offenen Prüfungen oder Releases fortsetzen. Sonst selbst den nächsten belegten Routinebefund mit dem grössten Nutzen auswählen. Vor der Übernahme Projektregeln, Main-Commit, Issues, PRs und Branch-Aktivität prüfen. Zuständigkeit, Ausgangscommit, Branch und Abnahmekriterium am bestehenden Issue oder PR festhalten. Ein neues Issue nur anlegen, wenn noch keines passt oder die Projektregeln es verlangen.
+2. **Liefern.** Eine zusammenhängende Verbesserung umsetzen und prüfen. Reproduzierbare Fehler, gescheiterte Checks und Merge-Konflikte selbst beheben. Über Aufgabenbranch und PR arbeiten. Nach grünen Pflichtchecks am aktuellen PR-Commit und erfüllten Schutzregeln den erlaubten Merge und den bestehenden Deployment-Ablauf selbst ausführen. Falls ein freigegebener Release einen separaten Dispatch braucht, diesen auslösen und den ausgelieferten Stand am betroffenen Nutzerablauf prüfen.
+3. **Fortsetzen.** Ist CI, Hosting oder eine Entscheidung noch offen, den konkreten nächsten Schritt im PR festhalten und unabhängige Arbeit weiterführen. Beim nächsten Lauf zuerst prüfen, ob die eigene offene Arbeit wieder aufgenommen werden kann. Bei aktiver Bearbeitung durch andere am bestehenden Vorgang koordinieren. Nur produktiv geprüfte Ergebnisse, relevante Abweichungen und Entscheidungen mit Handlungsbedarf berichten.
+
+Separate Entscheide von Mike sind bei wesentlichen Produktänderungen, neuen Kosten, produktiven SQL-Migrationen oder destruktiven Datenoperationen, echten Reise-, Buchungs- oder Finanzdaten, echtem Nachrichtenversand sowie erheblichen Sicherheits- oder Datenschutzrisiken nötig. Solche Entscheide gebündelt und mit konkreter Option vorlegen. Projektregeln, geschützte Pfade und bestehende Freigabegrenzen gelten bei jedem Release.
+
 | Projekt | Produktziel und wichtigste Abläufe | Geeignete Routineverbesserungen |
 | --- | --- | --- |
 | [Camino](https://mikefaehch.github.io/camino/) | Unterwegs den richtigen Tag finden, Route und GPX öffnen und den Plan offline lesen. | Navigation, sichtbare Offline-Zustände, Bedienung und Regressionstests bestehender Abläufe. |
@@ -30,10 +40,6 @@ Das [Projektinventar](platform/projects.json) definiert den Startpunkt. Die [Arb
 | [Edinburgh](https://mikefaehch.github.io/edinburgh/) | Tagesprogramm, Treffpunkte und ÖV-Links schnell nachschlagen. | Sprunglinks, Tastaturbedienung, Lesbarkeit und Touch-Flächen. |
 | [Valencia](https://mikefaehch.github.io/Valencia/) | Pablos Paella- und Tapas-Empfehlungen finden und auf der Karte öffnen. | Abschnittsnavigation, Lesbarkeit und Bedienung bestehender Kartenlinks. |
 | web-kit | Im Wizard eine Website konfigurieren und exportieren. In der geschützten Verwaltung den Projektstand und freigegebene Funktionen nutzen. | Verständliche Formular- und Exportzustände, reproduzierbare Tests sowie bessere Hinweise zu CI und Produktionsstand. |
-
-Im bestehenden regelmässigen Entwicklungslauf zuerst Produktions- und Sicherheitsfehler, fehlgeschlagene Prüfungen und freigegebene offene Arbeiten berücksichtigen. Danach einen belegten, reversiblen Routinebefund aus der Tabelle selbst auswählen. Vor der Übernahme Main-Commit, jüngste Branch-/PR-Aktivität und Projektregeln prüfen. Bei aktiver Bearbeitung oder einem Blocker die nächste unabhängige Aufgabe wählen. Befund, Ausgangscommit, Branch und Abnahmekriterium im passenden Issue festhalten. Eine einfache Verbesserung soll im selben Lauf bis zur Produktionskontrolle gelangen, wenn Prüfungen, Rechte und Release-Regeln dies erlauben.
-
-Die Tabelle dient der Aufgabenauswahl. Repository-Regeln, geschützte Pfade und bestehende Freigabegrenzen gelten für jeden PR. Grössere Produktentscheidungen, Kosten, Änderungen an echten Reise-, Buchungs- oder Finanzdaten sowie erhebliche Sicherheits- oder Datenschutzrisiken separat eskalieren. Den ausgelieferten Stand über den Produktionscheck oder eine gezielte Live-Prüfung belegen und offene Nachweise im PR festhalten.
 
 ## Release-Nachweis nach automatischem Merge
 
