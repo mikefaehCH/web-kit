@@ -30,3 +30,9 @@ jobs:
           node-version: '22'
       - name: Test versioned generator and CLI demo end to end
         run: npm --prefix generator test
+      - name: Install browser test tools
+        run: |
+          npm --prefix generator/tests/browser ci --ignore-scripts
+          generator/tests/browser/node_modules/.bin/playwright-core install chromium --only-shell
+      - name: Test app preview, storage, backup and offline mode in Chromium
+        run: node generator/tests/browser/planner.mjs

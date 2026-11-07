@@ -28,6 +28,8 @@ export const TEMPLATE_FILES = Object.freeze([
   'modules/shared-plan.js',
   'modules/site-generator.js',
   'modules/zip.js',
+  'modules/planner.js',
+  'modules/planner-state.js',
   'admin/site-schema.js',
   'admin/index.html',
   'admin/wizard.js',
@@ -77,6 +79,7 @@ export function generateProject(input, templates) {
   const put = (path, content) => output.set(path, encode(content));
   const definition = CATEGORY_REGISTRY.find((item) => item.id === site.category);
   const isTravel = definition.contract === 'dated-places';
+  const withPlanner = !!site.mode;
   const trip = isTravel ? validateTrip({ ...site, ...site.content }) : null;
   put('site.json', json(site));
   put(
@@ -92,10 +95,12 @@ export function generateProject(input, templates) {
     short_name: Array.from(site.title).slice(0, 24).join(''),
     theme_color: site.color,
   });
+  if (withPlanner) manifest.id = './?project=' + site.id;
   put('manifest.webmanifest', json(manifest));
   put(
     'index.html',
     text('templates/' + definition.contract + '/index.html')
+      .replace('<head>', site.mode === 'app' ? '<head>\n    <meta name="robots" content="noindex,nofollow" />' : '<head>')
       .replace(/<html lang="[^"]*">/, () => '<html lang="' + site.locale + '">')
       .replace(
         /(<meta\s+name="theme-color"\s+content=")[^"]*("\s*\/>)/,
@@ -107,10 +112,28 @@ export function generateProject(input, templates) {
         (_, a, b) => a + escapeHtml(site.description) + b,
       ),
   );
-  put('sw.js', text('sw.js').replace(/  '\.\/trips\/(city|walking)\.js',\n/g, ''));
+  let worker = text('sw.js').replace(/  '\.\/trips\/(city|walking)\.js',\n/g, '');
+  if (withPlanner) {
+    worker = worker
+      .replace("const PREFIX = 'travel-shell:' + self.registration.scope + ':';",
+        "const PREFIX = 'planner-shell:' + self.registration.scope + ':' + " + JSON.stringify(site.id + ':') + ';')
+      .replace(/const ASSETS = \[.*?\];/s, 'const ASSETS = ' + JSON.stringify([
+        './', './index.html', './app.js', './config.js', './style.css', './manifest.webmanifest',
+        './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png',
+        './modules/planner.js', './modules/planner-state.js',
+      ], null, 2) + ';')
+      .replace(
+        "!response.headers.get('cache-control')?.includes('no-store')",
+        "!/(?:^|,)\\s*(?:private|no-store)\\b/i.test(response.headers.get('cache-control') || '')",
+      );
+  }
+  put('sw.js', worker);
   put(
     'README.md',
-    '# Generierte Website\n\nsite.json ist die Konfigurationsquelle. Neu generieren: `node scripts/create.mjs site.json /neues/ziel`. Bestehende Ziele werden nicht überschrieben. Keine Beispieldaten oder Cloud-Autorisierung enthalten.\n\nNode 22+: `npm ci --ignore-scripts`, `npm test`. Lokal mit einem statischen HTTP-Server starten; für Veröffentlichung HTTPS verwenden. Der Wizard unter admin/ kann ebenfalls ein vollständiges ZIP exportieren. Keine Anmeldung erforderlich.\n',
+    '# Generierte Website\n\nsite.json ist die Konfigurationsquelle. Neu generieren: `node scripts/create.mjs site.json /neues/ziel`. Bestehende Ziele werden nicht überschrieben. Keine Beispieldaten oder Cloud-Autorisierung enthalten.\n\nNode 22+: `npm ci --ignore-scripts`, `npm test`. Lokal mit einem statischen HTTP-Server starten; für Veröffentlichung HTTPS verwenden. Der Wizard unter admin/ kann ebenfalls ein vollständiges ZIP exportieren. Keine Anmeldung erforderlich.\n' +
+      (withPlanner
+        ? '\nPlanereinträge liegen im Browserprofil. Backups über die App exportieren und importieren. Eine persönliche Vorschau auf localhost oder mit serverseitigem Zugriffsschutz öffnen.\n'
+        : ''),
   );
   put(
     'tests/generated.mjs',

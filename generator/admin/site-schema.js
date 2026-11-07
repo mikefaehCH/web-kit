@@ -1,6 +1,11 @@
 import { MODULES, SLUG } from '../modules/config.js';
 import { CATEGORY_REGISTRY } from '../categories/registry.js';
 export { MODULES, CATEGORY_REGISTRY };
+export const SITE_MODES = Object.freeze({
+  website: 'Website',
+  hybrid: 'Website mit App-Bereich',
+  app: 'Persönliche App',
+});
 export const CATEGORIES = Object.freeze(CATEGORY_REGISTRY.map((item) => item.id));
 const object = (value) => value && typeof value === 'object' && !Array.isArray(value);
 const keys = (value, allowed) => {
@@ -58,6 +63,7 @@ export function validateSite(input, catalog = CATEGORY_REGISTRY) {
   const source = migrateSite(input);
   keys(source, [
     'version',
+    'mode',
     'category',
     'preset',
     'id',
@@ -69,9 +75,12 @@ export function validateSite(input, catalog = CATEGORY_REGISTRY) {
     'content',
   ]);
   const { version, category, preset, id, color, locale, modules, content } = source;
+  const mode = source.mode === undefined ? 'website' : source.mode;
   const definition = catalog.find((item) => item.id === category);
   if (version !== 2 || !definition || !definition.presets.some((item) => item.id === preset))
     throw Error('Unbekannte Schema-Version, Kategorie oder Vorlage');
+  if (typeof mode !== 'string' || !Object.hasOwn(SITE_MODES, mode) || (mode !== 'website' && definition.contract !== 'sections'))
+    throw Error('Ungültiger Modus für diese Vorlage');
   if (typeof id !== 'string' || id.length > 64 || !SLUG.test(id))
     throw Error('Ungültige Projekt-ID');
   const title = text(source.title, 100, 'Titel');
@@ -126,6 +135,8 @@ export function validateSite(input, catalog = CATEGORY_REGISTRY) {
     keys(content, ['sections']);
     if (!Array.isArray(content.sections) || content.sections.length > 50)
       throw Error('Ungültige Abschnitte');
+    if (mode === 'app' && content.sections.length)
+      throw Error('Persönliche Apps verwenden den Planer als Startansicht. Für öffentliche Abschnitte den kombinierten Modus wählen.');
     const sections = content.sections.map((section) => {
       keys(section, ['heading', 'text']);
       return Object.freeze({
@@ -137,6 +148,7 @@ export function validateSite(input, catalog = CATEGORY_REGISTRY) {
   }
   return Object.freeze({
     version: 2,
+    ...(mode === 'website' ? {} : { mode }),
     category,
     preset,
     id,
@@ -150,6 +162,7 @@ export function validateSite(input, catalog = CATEGORY_REGISTRY) {
 }
 export function makeSite({
   category = 'travel',
+  mode = 'website',
   preset,
   id = 'meine-website',
   title = 'Meine Website',
@@ -168,6 +181,7 @@ export function makeSite({
   const definition = CATEGORY_REGISTRY.find((item) => item.id === category);
   return validateSite({
     version: 2,
+    mode,
     category,
     preset: preset ?? definition?.presets[0].id,
     id,
@@ -190,7 +204,7 @@ export function makeSite({
 // A brief is a separate input format. Generated projects still use canonical site.json.
 export function makeSiteFromBrief(brief) {
   keys(brief, [
-    'purpose', 'audience', 'title', 'id', 'color', 'locale',
+    'purpose', 'audience', 'mode', 'title', 'id', 'color', 'locale',
     'category', 'preset', 'modules', 'content',
   ]);
   const purpose = text(brief.purpose, 500, 'Zweck');
@@ -209,7 +223,8 @@ export function makeSiteFromBrief(brief) {
     .slice(0, 64)
     .replace(/-$/, '');
   const category = brief.category ?? 'general';
-  const defaultContent = category === 'general'
+  const mode = brief.mode === undefined ? 'website' : brief.mode;
+  const defaultContent = category === 'general' && mode !== 'app'
     ? {
         sections: [
           { heading: 'Überblick', text: purpose },
@@ -219,6 +234,7 @@ export function makeSiteFromBrief(brief) {
     : undefined;
   return makeSite({
     category,
+    mode,
     preset: brief.preset,
     id: brief.id ?? (suggestedId || 'meine-website'),
     title,

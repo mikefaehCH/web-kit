@@ -3,7 +3,7 @@
 Vergleiche den normalen Einstieg und die darin verlinkten eigenen Skripte und Stylesheets mit einem Checkout des erwarteten Releases. Versionsparameter bleiben in den HTTP-Anfragen erhalten. Zusätzliche Dateien wie der Service Worker oder dynamisch geladene Module können als relative URLs mitgegeben werden.
 
 ```sh
-node scripts/check-release-assets.mjs https://mikefaehch.github.io/web-kit/admin/ generator/admin 'wizard.js?v=20261107-preview'
+node scripts/check-release-assets.mjs https://mikefaehch.github.io/web-kit/admin/ generator/admin 'wizard.js?v=20261107-app'
 node scripts/check-release-assets.mjs https://mikefaehch.github.io/Sommer2027/ ../Sommer2027 sw.js
 ```
 

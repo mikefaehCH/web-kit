@@ -25,6 +25,47 @@
     </header>
     <main id="main">
       <div id="sections"></div>
+      <section id="planner" aria-labelledby="planner-heading" tabindex="-1" hidden>
+        <h2 id="planner-heading">Mein Planer</h2>
+        <form>
+          <fieldset disabled>
+            <legend>Idee oder Aufgabe</legend>
+            <label>Titel <input name="title" maxlength="140" required /></label>
+            <label>Art
+              <select name="kind">
+                <option value="idea">Idee</option>
+                <option value="task">Aufgabe</option>
+              </select>
+            </label>
+            <div class="planner-actions">
+              <button id="planner-save" type="submit">Eintrag erfassen</button>
+              <button id="planner-cancel" type="button" hidden>Bearbeitung abbrechen</button>
+            </div>
+          </fieldset>
+        </form>
+        <p id="planner-status" role="status"></p>
+        <fieldset disabled>
+          <legend>Einträge</legend>
+          <label>Filter
+            <select id="planner-filter">
+              <option value="all">Alle</option>
+              <option value="open">Offen</option>
+              <option value="done">Erledigt</option>
+            </select>
+          </label>
+          <p id="planner-empty">Hier erscheinen deine Einträge.</p>
+          <ul id="planner-list"></ul>
+        </fieldset>
+        <details>
+          <summary>Daten und Backup</summary>
+          <p>Deine Einträge liegen in diesem Browserprofil auf diesem Gerät. Für einen Gerätewechsel exportiere ein Backup und importiere es in dieselbe App.</p>
+          <fieldset disabled>
+            <legend>Backup</legend>
+            <button id="planner-export" type="button">Backup herunterladen</button>
+            <label>Backup wiederherstellen <input id="planner-import" type="file" accept=".json,application/json" /></label>
+          </fieldset>
+        </details>
+      </section>
       <p id="offline-status" role="status"></p>
     </main>
   </body>
