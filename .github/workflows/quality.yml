@@ -38,3 +38,5 @@ jobs:
           generator/tests/browser/node_modules/.bin/playwright-core install chromium --only-shell
       - name: Test app preview, storage, backup and offline mode in Chromium
         run: node generator/tests/browser/planner.mjs
+      - name: Test admin password, two-factor login and recovery in Chromium
+        run: node generator/tests/browser/admin-login.mjs
