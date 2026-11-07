@@ -37,3 +37,30 @@ test('backup roundtrip, invalid inputs and project storage isolation', () => {
   assert.notEqual(plannerKey('mein-planer', '/eins/'), plannerKey('mein-planer', '/zwei/'));
   assert.notEqual(plannerKey('mein-planer', '/eins/'), plannerKey('anderer-planer', '/eins/'));
 });
+
+test('collection briefing supplies its own defaults and preserves legacy planner configurations', () => {
+  const site = makeSiteFromBrief({ purpose: 'Bücher wiederfinden', plannerProfile: 'collection' });
+  assert.equal(site.mode, 'app');
+  assert.equal(site.plannerProfile, 'collection');
+  assert.equal(site.modules.offline, true);
+  assert.deepEqual(validateSite(site), site);
+  assert.throws(() => makeSiteFromBrief({ ...brief, mode: 'website', plannerProfile: 'collection' }), /App-Profil/);
+  assert.throws(() => makeSiteFromBrief({ ...brief, mode: 'app', plannerProfile: 'random' }), /App-Profil/);
+  assert.throws(() => validateSite({
+    ...site, plannerFields: [{ id: 'category', label: 'Kategorie', type: 'text' }],
+  }), /bereits/);
+});
+
+test('old backups stay readable in the planner and collection backups remain isolated by profile', () => {
+  const project = 'mein-projekt';
+  const original = exportPlanner(project, [entry]);
+  assert.equal(Object.hasOwn(JSON.parse(original), 'profile'), false);
+  assert.deepEqual(importPlanner(original, project), [entry]);
+  const book = { ...entry, values: { category: 'Sachbuch', note: 'Für später' } };
+  const backup = exportPlanner(project, [book], 'collection');
+  assert.deepEqual(importPlanner(backup, project, 'collection'), [book]);
+  assert.throws(() => importPlanner(backup, 'fremd', 'collection'), /anderen Projekt/);
+  assert.throws(() => importPlanner(backup, project), /anderen App-Profil/);
+  assert.throws(() => importPlanner(original, project, 'collection'), /anderen App-Profil/);
+  assert.notEqual(plannerKey(project, '/', 'collection'), plannerKey(project, '/'));
+});

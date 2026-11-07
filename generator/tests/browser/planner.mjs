@@ -41,6 +41,16 @@ try {
     execFileSync(process.execPath, [join(generator, 'scripts/create.mjs'), '--brief', brief, destination]);
     paths.set(name, destination);
   }
+  const collectionBrief = join(scratch, 'collection.json');
+  await writeFile(collectionBrief, JSON.stringify({
+    purpose: 'Bücher sammeln und wiederfinden.', plannerProfile: 'collection',
+    title: 'Meine Büchersammlung', id: data.id,
+  }));
+  for (const name of ['collection', 'collection-other']) {
+    const destination = join(scratch, name);
+    execFileSync(process.execPath, [join(generator, 'scripts/create.mjs'), '--brief', collectionBrief, destination]);
+    paths.set(name, destination);
+  }
   const appConfig = await readFile(join(paths.get('app'), 'site.json'));
   assert.deepEqual(await readFile(join(paths.get('other'), 'site.json')), appConfig);
   assert.throws(
@@ -163,6 +173,68 @@ try {
       assert.match(execFileSync('unzip', ['-p', archive, 'index.html'], { encoding: 'utf8' }), /noindex,nofollow/);
     }
 
+    await page.goto(base + 'collection/');
+    await page.getByRole('heading', { name: 'Meine Sammlung' }).waitFor();
+    assert.equal(await page.getByLabel('Art', { exact: true }).isVisible(), false);
+    const addBook = async (name, category, note) => {
+      await input.fill(name);
+      await page.getByLabel('Kategorie', { exact: true }).fill(category);
+      await page.getByLabel('Notiz').fill(note);
+      await save.click();
+      await page.getByRole('heading', { name }).waitFor();
+    };
+    await addBook('Bergwege', 'Reisen', 'Route über den Alpenpass');
+    await addBook('Stadtgärten', 'Sachbuch', 'Tipps für den Balkon');
+    const search = page.getByRole('searchbox', { name: 'Suche' });
+    const category = page.getByRole('combobox', { name: 'Kategorie filtern' });
+    await search.fill('ALPENPASS');
+    assert.equal(await page.getByRole('heading', { name: 'Bergwege' }).count(), 1);
+    assert.equal(await page.getByRole('heading', { name: 'Stadtgärten' }).count(), 0);
+    await search.fill('');
+    await category.selectOption({ label: 'Sachbuch' });
+    assert.equal(await page.getByRole('heading', { name: 'Bergwege' }).count(), 0);
+    await page.getByRole('button', { name: 'Bearbeiten: Stadtgärten' }).click();
+    await page.getByLabel('Notiz').fill('Tipps für den Innenhof');
+    await page.getByRole('button', { name: 'Änderungen speichern' }).click();
+    await page.getByText('Notiz · Tipps für den Innenhof').waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+    const collectionCaches = await page.evaluate(() => caches.keys());
+    assert.ok(collectionCaches.some(key => key.includes('/collection/:ideenplaner:')));
+    assert.ok(collectionCaches.some(key => key.includes('/app/:ideenplaner:')));
+    await profile.setOffline(true);
+    await page.reload();
+    await page.getByText('Notiz · Tipps für den Innenhof').waitFor();
+    await profile.setOffline(false);
+
+    await page.getByText('Daten und Backup', { exact: true }).click();
+    const collectionExport = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Backup herunterladen' }).click();
+    const collectionBackup = await readFile(await (await collectionExport).path());
+    assert.equal(JSON.parse(collectionBackup).profile, 'collection');
+    await importFile.setInputFiles({ name: 'planer.json', mimeType: 'application/json', buffer: backup });
+    await status.filter({ hasText: 'anderen App-Profil' }).waitFor();
+    await page.getByRole('heading', { name: 'Stadtgärten' }).waitFor();
+
+    await addBook('Zusätzlicher Eintrag', 'Sonstiges', 'Bleibt ohne Bestätigung erhalten');
+    page.once('dialog', dialog => dialog.dismiss());
+    await importFile.setInputFiles({ name: 'sammlung.json', mimeType: 'application/json', buffer: collectionBackup });
+    await status.filter({ hasText: 'Import abgebrochen' }).waitFor();
+    await page.getByRole('heading', { name: 'Zusätzlicher Eintrag' }).waitFor();
+    page.once('dialog', dialog => dialog.accept());
+    await importFile.setInputFiles({ name: 'sammlung.json', mimeType: 'application/json', buffer: collectionBackup });
+    await status.filter({ hasText: 'Einträge wiederhergestellt' }).waitFor();
+    assert.equal(await page.getByRole('heading', { name: 'Zusätzlicher Eintrag' }).count(), 0);
+
+    await other.goto(base + 'collection-other/');
+    await other.getByRole('textbox', { name: 'Titel' }).fill('Separater Installationspfad');
+    assert.equal(await other.getByRole('heading', { name: 'Stadtgärten' }).count(), 0);
+    await other.getByText('Daten und Backup', { exact: true }).click();
+    await other.locator('#planner-import').setInputFiles({
+      name: 'sammlung.json', mimeType: 'application/json', buffer: collectionBackup,
+    });
+    await other.getByText('Notiz · Tipps für den Innenhof').waitFor();
+
     await page.goto(base + 'wizard/ai/etappe-1.html');
     const assistant = page.locator('.wk-assistant');
     const question = assistant.getByRole('textbox', { name: 'Deine Frage oder dein Auftrag' });
@@ -242,8 +314,22 @@ try {
     assert.equal(aiSite.plannerFields.at(-1).id, 'trainingsart');
     assert.doesNotMatch(JSON.stringify(aiSite), /Aufschlag geübt/);
 
+    await page.goto(base + 'wizard/admin/');
+    await propose('Ich möchte meine Bücher sammeln und wiederfinden.');
+    await preview.getByRole('heading', { name: 'Meine Sammlung' }).waitFor();
+    await preview.getByLabel('Kategorie', { exact: true }).waitFor();
+    assert.equal(await page.locator('select[name=plannerProfile]').inputValue(), 'collection');
+    await page.getByText('Titel · Kategorie · Notiz').waitFor();
+    await page.getByRole('button', { name: 'Konfiguration prüfen' }).click();
+    const collectionZip = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Website erstellen' }).click();
+    const collectionArchive = await (await collectionZip).path();
+    const collectionSite = JSON.parse(execFileSync('unzip', ['-p', collectionArchive, 'site.json']));
+    assert.equal(collectionSite.plannerProfile, 'collection');
+    assert.equal(collectionSite.mode, 'app');
+
     assert.deepEqual(errors, []);
-    console.log(width + ' px: Planer, Backup, Offline, Speicherisolation und KI-Demos bestanden.');
+    console.log(width + ' px: Planer, Sammlung, Backup, Offline, Speicherisolation und KI-Demos bestanden.');
     await profile.close();
   }
 } finally {

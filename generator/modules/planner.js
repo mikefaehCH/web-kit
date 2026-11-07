@@ -1,14 +1,24 @@
 import {
   ENTRY_KINDS, MAX_BACKUP_BYTES, exportPlanner, importPlanner, openPlanner,
 } from './planner-state.js';
+import { COLLECTION_PROFILE, plannerLabel } from './planner-profiles.js';
 
-export async function mountPlanner(root, projectId, { fields = [], scope } = {}) {
+export async function mountPlanner(root, projectId, { fields = [], profile, scope } = {}) {
+  const collection = profile === COLLECTION_PROFILE;
   const form = root.querySelector('form');
   const title = form.elements.namedItem('title');
   const kind = form.elements.namedItem('kind');
   const save = root.querySelector('#planner-save');
   const cancel = root.querySelector('#planner-cancel');
   const filter = root.querySelector('#planner-filter');
+  const search = root.querySelector('#planner-search');
+  if (collection) {
+    root.querySelector('#planner-heading').textContent = plannerLabel(profile);
+    root.querySelector('#planner-editor-label').textContent = 'Sammlungseintrag';
+    root.querySelector('#planner-filter-label').textContent = 'Kategorie filtern';
+    kind.closest('label').hidden = true;
+    search.closest('label').hidden = false;
+  }
   const list = root.querySelector('#planner-list');
   const empty = root.querySelector('#planner-empty');
   const status = root.querySelector('#planner-status');
@@ -47,7 +57,21 @@ export async function mountPlanner(root, projectId, { fields = [], scope } = {})
   }
 
   function render() {
-    const visible = entries.filter(entry => filter.value === 'all' || entry.done === (filter.value === 'done'));
+    if (collection) {
+      const selected = filter.value;
+      const categories = [...new Set(entries.map(entry => entry.values?.category).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'de-CH'));
+      filter.replaceChildren(new Option('Alle Kategorien', 'all'),
+        ...categories.map(category => new Option(category, ':' + category)));
+      filter.value = categories.some(category => ':' + category === selected) ? selected : 'all';
+    }
+    const query = collection ? search.value.trim().normalize().toLocaleLowerCase('de-CH') : '';
+    const visible = entries.filter(entry => {
+      if (!collection) return filter.value === 'all' || entry.done === (filter.value === 'done');
+      if (filter.value !== 'all' && ':' + entry.values?.category !== filter.value) return false;
+      return !query || [entry.title, ...Object.values(entry.values ?? {})]
+        .some(value => value.normalize().toLocaleLowerCase('de-CH').includes(query));
+    });
     list.replaceChildren();
     empty.hidden = visible.length > 0;
     empty.textContent = entries.length ? 'Keine Einträge für diesen Filter.' : 'Hier erscheinen deine Einträge.';
@@ -64,19 +88,23 @@ export async function mountPlanner(root, projectId, { fields = [], scope } = {})
       edit.textContent = 'Bearbeiten';
       edit.setAttribute('aria-label', 'Bearbeiten: ' + entry.title);
       edit.addEventListener('click', () => startEdit(entry));
-      const toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.textContent = entry.done ? 'Wieder öffnen' : 'Abschliessen';
-      toggle.setAttribute('aria-label', toggle.textContent + ': ' + entry.title);
-      toggle.addEventListener('click', async () => {
-        const saved = await change(
-          current => replaceEntry(current, entry, { done: !entry.done }),
-          entry.done ? 'Eintrag wieder geöffnet.' : 'Eintrag abgeschlossen.',
-        );
-        if (saved) filter.focus();
-      });
-      actions.append(edit, toggle);
-      item.append(badge, heading);
+      actions.append(edit);
+      if (!collection) {
+        item.append(badge);
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.textContent = entry.done ? 'Wieder öffnen' : 'Abschliessen';
+        toggle.setAttribute('aria-label', toggle.textContent + ': ' + entry.title);
+        toggle.addEventListener('click', async () => {
+          const saved = await change(
+            current => replaceEntry(current, entry, { done: !entry.done }),
+            entry.done ? 'Eintrag wieder geöffnet.' : 'Eintrag abgeschlossen.',
+          );
+          if (saved) filter.focus();
+        });
+        actions.append(toggle);
+      }
+      item.append(heading);
       for (const { id, label } of controls) {
         if (!entry.values || !Object.hasOwn(entry.values, id) || !entry.values[id]) continue;
         const detail = document.createElement('p');
@@ -101,7 +129,7 @@ export async function mountPlanner(root, projectId, { fields = [], scope } = {})
   }
 
   try {
-    store = await openPlanner(projectId, scope);
+    store = await openPlanner(projectId, scope, profile);
     entries = await store.read();
   } catch (error) {
     report(error.message + '. Für diesen Browser können keine Einträge gespeichert werden.');
@@ -110,6 +138,7 @@ export async function mountPlanner(root, projectId, { fields = [], scope } = {})
   root.querySelectorAll('fieldset').forEach(fieldset => { fieldset.disabled = false; });
   render();
   filter.addEventListener('change', render);
+  if (collection) search.addEventListener('input', render);
   cancel.addEventListener('click', () => { resetEditor(); title.focus(); });
 
   form.addEventListener('submit', async (event) => {
@@ -139,6 +168,7 @@ export async function mountPlanner(root, projectId, { fields = [], scope } = {})
     if (saved) {
       resetEditor();
       filter.value = 'all';
+      search.value = '';
       render();
       title.focus();
     }
@@ -146,7 +176,7 @@ export async function mountPlanner(root, projectId, { fields = [], scope } = {})
 
   root.querySelector('#planner-export').addEventListener('click', async () => {
     try {
-      const backup = exportPlanner(projectId, await store.read());
+      const backup = exportPlanner(projectId, await store.read(), profile);
       const url = URL.createObjectURL(new Blob([backup], { type: 'application/json' }));
       const link = document.createElement('a');
       link.href = url;
@@ -164,7 +194,7 @@ export async function mountPlanner(root, projectId, { fields = [], scope } = {})
     if (!file) return;
     try {
       if (file.size > MAX_BACKUP_BYTES) throw Error('Backup ist zu gross');
-      const imported = importPlanner(await file.text(), projectId);
+      const imported = importPlanner(await file.text(), projectId, profile);
       const snapshot = await store.read();
       if (snapshot.length && !window.confirm(
         'Die ' + snapshot.length + ' lokalen Einträge durch ' + imported.length + ' Einträge aus dem Backup ersetzen?',
@@ -177,7 +207,14 @@ export async function mountPlanner(root, projectId, { fields = [], scope } = {})
           throw Error('Einträge wurden zwischenzeitlich geändert. Bitte erneut importieren.');
         return imported;
       }, imported.length + ' Einträge wiederhergestellt.');
-      if (saved) resetEditor();
+      if (saved) {
+        resetEditor();
+        if (collection) {
+          filter.value = 'all';
+          search.value = '';
+          render();
+        }
+      }
     } catch (error) {
       report('Import fehlgeschlagen. ' + error.message);
     } finally {

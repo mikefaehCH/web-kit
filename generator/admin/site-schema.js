@@ -1,3 +1,4 @@
+import { COLLECTION_FIELDS, COLLECTION_PROFILE } from '../modules/planner-profiles.js';
 import { MODULES, SLUG } from '../modules/config.js';
 import { CATEGORY_REGISTRY } from '../categories/registry.js';
 export { MODULES, CATEGORY_REGISTRY };
@@ -87,6 +88,7 @@ export function validateSite(input, catalog = CATEGORY_REGISTRY) {
     'modules',
     'content',
     'plannerFields',
+    'plannerProfile',
   ]);
   const { version, category, preset, id, color, locale, modules, content } = source;
   const mode = source.mode === undefined ? 'website' : source.mode;
@@ -161,10 +163,16 @@ export function validateSite(input, catalog = CATEGORY_REGISTRY) {
     normalized = { sections: Object.freeze(sections) };
   }
   const plannerFields = source.plannerFields === undefined ? [] : validatePlannerFields(source.plannerFields);
+  const plannerProfile = source.plannerProfile;
+  if (plannerProfile !== undefined && (plannerProfile !== COLLECTION_PROFILE || mode === 'website'))
+    throw Error('Ungültiges App-Profil für diesen Modus');
+  if (plannerProfile === COLLECTION_PROFILE && plannerFields.some(field => COLLECTION_FIELDS.some(fixed => fixed.id === field.id)))
+    throw Error('Kategorie und Notiz gehören bereits zur Sammlung');
   if (plannerFields.length && mode === 'website') throw Error('Zusatzfelder benötigen einen Planer');
   return Object.freeze({
     version: 2,
     ...(plannerFields.length ? { plannerFields } : {}),
+    ...(plannerProfile === undefined ? {} : { plannerProfile }),
     ...(mode === 'website' ? {} : { mode }),
     category,
     preset,
@@ -189,6 +197,7 @@ export function makeSite({
   modules = {},
   content,
   plannerFields,
+  plannerProfile,
   start,
   end,
 } = {}) {
@@ -200,6 +209,7 @@ export function makeSite({
   return validateSite({
     version: 2,
     ...(plannerFields === undefined ? {} : { plannerFields }),
+    ...(plannerProfile === undefined ? {} : { plannerProfile }),
     mode,
     category,
     preset: preset ?? definition?.presets[0].id,
@@ -224,10 +234,13 @@ export function makeSite({
 export function makeSiteFromBrief(brief) {
   keys(brief, [
     'purpose', 'audience', 'mode', 'title', 'id', 'color', 'locale',
-    'category', 'preset', 'modules', 'content', 'plannerFields',
+    'category', 'preset', 'modules', 'content', 'plannerFields', 'plannerProfile',
   ]);
   const purpose = text(brief.purpose, 500, 'Zweck');
-  const audience = text(brief.audience, 300, 'Zielgruppe');
+  const mode = brief.mode === undefined
+    ? (brief.plannerProfile === COLLECTION_PROFILE ? 'app' : 'website')
+    : brief.mode;
+  const audience = text(brief.audience === undefined && mode === 'app' ? 'Für mich' : brief.audience, 300, 'Zielgruppe');
   const title = brief.title === undefined
     ? purpose.slice(0, 100).replace(/[\uD800-\uDBFF]$/, '').trimEnd()
     : text(brief.title, 100, 'Titel');
@@ -242,7 +255,6 @@ export function makeSiteFromBrief(brief) {
     .slice(0, 64)
     .replace(/-$/, '');
   const category = brief.category ?? 'general';
-  const mode = brief.mode === undefined ? 'website' : brief.mode;
   const defaultContent = category === 'general' && mode !== 'app'
     ? {
         sections: [
@@ -262,6 +274,7 @@ export function makeSiteFromBrief(brief) {
     locale: brief.locale,
     modules: brief.modules,
     plannerFields: brief.plannerFields,
+    plannerProfile: brief.plannerProfile,
     content: brief.content ?? defaultContent,
   });
 }

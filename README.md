@@ -41,8 +41,8 @@ Die vorhandene `site.json` v2 bleibt die Konfigurationsquelle.
 | Modus | Geeignet für | Erste Vorschau |
 | --- | --- | --- |
 | `website` (Standard) | Lesen, entdecken, Reisetage nachschlagen | Bestehende Website-Vorlage |
-| `hybrid` | Öffentliche Information mit persönlichem Werkzeug | Infoseite mit Sprunglink zum gerätelokalen Planer |
-| `app` | Wiederkehrende persönliche Aufgabe | Planer als Startansicht, lokal oder mit serverseitigem Zugriffsschutz |
+| `hybrid` | Öffentliche Information mit persönlichem Werkzeug | Infoseite mit Sprunglink zum gerätelokalen Werkzeug |
+| `app` | Wiederkehrende persönliche Aufgabe | Werkzeug als Startansicht, lokal oder mit serverseitigem Zugriffsschutz |
 
 Beispiel für ein fiktives Kurzbriefing in `brief.json`:
 
@@ -61,29 +61,46 @@ node generator/scripts/create.mjs --brief brief.json /tmp/mein-ideenplaner
 python3 -m http.server 8765 --bind 127.0.0.1 --directory /tmp/mein-ideenplaner
 ```
 
-Persönliche und kombinierte Apps verwenden zunächst die Infovorlage mit dem
-Ideen- und Aufgabenplaner. Die persönliche App startet direkt mit der Erfassung.
-Für eine kombinierte Seite ergänze öffentliche Abschnitte unter
-`content.sections`. Ein anderes Werkzeug kann dieselbe Oberfläche und die
-Datenhaltung wiederverwenden. Falls es eigene Felder oder Abläufe benötigt,
-dafür einen passenden, separat validierten Datentyp und Renderer ergänzen.
+Für persönliche und kombinierte Apps stehen der Ideen- und Aufgabenplaner
+und das Profil «Persönliche Sammlung» zur Verfügung. Die persönliche App
+startet direkt mit der Erfassung. Für eine kombinierte Seite ergänze
+öffentliche Abschnitte unter `content.sections`.
 
-**Daten und Zugriff.** Einträge liegen in IndexedDB, getrennt nach Installation
-und Projekt-ID. Das Backup bleibt eine persönliche Datei und lässt sich in
-derselben App mit gleicher Projekt-ID wiederherstellen. Das Browserprofil
-bestimmt, welche Einträge beim Öffnen sichtbar sind. Löschungen der Browserdaten
-können sie entfernen. In einer kombinierten Website sind die ausgelieferten
-Inhalte und der Planer-Code öffentlich. Für eine online erreichbare persönliche
-App den Zugriff auf die Auslieferung serverseitig beschränken. Die
-Online-Veröffentlichung eines konkreten Projekts ist ein eigener Schritt.
+**Sammlung aus einem Satz.** «Ich möchte meine Bücher sammeln und wiederfinden.»
+Im Wizard öffnet das Bücher-Beispiel nach der Übernahme eine bedienbare
+Vorschau. Für den CLI-Generator genügt diese Briefing-Konfiguration:
+
+```json
+{"purpose":"Bücher sammeln und wiederfinden.","plannerProfile":"collection"}
+```
+
+Das Profil setzt die persönliche App als Standard und aktiviert Titel,
+Kategorie, Notiz, Suche, Kategoriefilter und Backup. Titel, Farben und bis
+zu fünf weitere Felder über `plannerFields` bleiben konfigurierbar. Dieselbe
+Sammlung kann zum Beispiel für Rezepte, Ausrüstung oder Bücher verwendet
+werden. Ein Ablauf mit anderen Aktionen, etwa einer Ausleihe mit Rückgabe
+und Fristen, braucht eigene fachliche Logik.
+
+**Daten und Zugriff.** Einträge liegen in IndexedDB, getrennt nach Installation,
+Projekt-ID und App-Profil. Ein Backup gehört zur gleichen Projekt-ID und zum
+gleichen Profil. Bisherige Aufgabenplaner-Backups bleiben im Aufgabenplaner
+lesbar. Exportiere vor dem Gerätewechsel in der App über «Daten und Backup»
+und importiere die Datei auf dem neuen Gerät in dasselbe Projekt. Das
+Browserprofil bestimmt, welche Einträge beim Öffnen sichtbar sind. Löschungen
+der Browserdaten können sie entfernen. In einer kombinierten Website sind
+die ausgelieferten Inhalte und der Werkzeug-Code öffentlich. Für eine online
+erreichbare persönliche App den Zugriff auf die Auslieferung serverseitig
+beschränken. Die Online-Veröffentlichung eines konkreten Projekts ist ein
+eigener Schritt.
 
 **Startbildschirm und Offline.** Für einen Gerätetest einen HTTPS-Zugang mit
 Zugriffsschutz verwenden. Auf dem iPhone in Safari über das Teilen-Menü
 «Zu Home-Bildschirm hinzufügen» und «Als Web-App öffnen» wählen.
 Auf Android in Chrome das Menü zur Installation der Web-App öffnen.
 Einmal online öffnen und auf «Offline verfügbar» warten. Danach die
-installierte App im Flugmodus öffnen und einen Testeintrag speichern.
-Browser- und Gerätetests separat festhalten.
+installierte App im Flugmodus öffnen, einen fiktiven Eintrag mit Kategorie
+und Notiz speichern, neu starten und ihn über die Suche wiederfinden. Gerät,
+Browser und Ergebnis separat von der Browser-Emulation festhalten.
 
 ## KI-Assistent einbetten
 
