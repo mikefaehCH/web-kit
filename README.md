@@ -33,6 +33,58 @@ Schema angeben. Die erzeugte `site.json` lässt sich zur weiteren Bearbeitung in
 den Wizard importieren. Der Zielordner muss neu sein. Der Ablauf legt lokal
 Dateien an. Eine Veröffentlichung erfolgt separat.
 
+### Eine App aus dem Kurzbriefing
+
+Aus dem Auftrag den Modus anhand des Hauptziels wählen und als `mode` setzen.
+Die vorhandene `site.json` v2 bleibt die Konfigurationsquelle.
+
+| Modus | Geeignet für | Erste Vorschau |
+| --- | --- | --- |
+| `website` (Standard) | Lesen, entdecken, Reisetage nachschlagen | Bestehende Website-Vorlage |
+| `hybrid` | Öffentliche Information mit persönlichem Werkzeug | Infoseite mit Sprunglink zum gerätelokalen Planer |
+| `app` | Wiederkehrende persönliche Aufgabe | Planer als Startansicht, lokal oder mit serverseitigem Zugriffsschutz |
+
+Beispiel für ein fiktives Kurzbriefing in `brief.json`:
+
+```json
+{
+  "purpose": "Ideen sammeln und Aufgaben abschliessen.",
+  "audience": "Eine Person im Alltag",
+  "mode": "app",
+  "title": "Mein Ideenplaner",
+  "color": "#225e4a"
+}
+```
+
+```sh
+node generator/scripts/create.mjs --brief brief.json /tmp/mein-ideenplaner
+python3 -m http.server 8765 --bind 127.0.0.1 --directory /tmp/mein-ideenplaner
+```
+
+Persönliche und kombinierte Apps verwenden zunächst die Infovorlage mit dem
+Ideen- und Aufgabenplaner. Die persönliche App startet direkt mit der Erfassung.
+Für eine kombinierte Seite ergänze öffentliche Abschnitte unter
+`content.sections`. Ein anderes Werkzeug kann dieselbe Oberfläche und die
+Datenhaltung wiederverwenden. Falls es eigene Felder oder Abläufe benötigt,
+dafür einen passenden, separat validierten Datentyp und Renderer ergänzen.
+
+**Daten und Zugriff.** Einträge liegen in IndexedDB, getrennt nach Installation
+und Projekt-ID. Das Backup bleibt eine persönliche Datei und lässt sich in
+derselben App mit gleicher Projekt-ID wiederherstellen. Das Browserprofil
+bestimmt, welche Einträge beim Öffnen sichtbar sind. Löschungen der Browserdaten
+können sie entfernen. In einer kombinierten Website sind die ausgelieferten
+Inhalte und der Planer-Code öffentlich. Für eine online erreichbare persönliche
+App den Zugriff auf die Auslieferung serverseitig beschränken. Die
+Online-Veröffentlichung eines konkreten Projekts ist ein eigener Schritt.
+
+**Startbildschirm und Offline.** Für einen Gerätetest einen HTTPS-Zugang mit
+Zugriffsschutz verwenden. Auf dem iPhone in Safari über das Teilen-Menü
+«Zu Home-Bildschirm hinzufügen» und «Als Web-App öffnen» wählen.
+Auf Android in Chrome das Menü zur Installation der Web-App öffnen.
+Einmal online öffnen und auf «Offline verfügbar» warten. Danach die
+installierte App im Flugmodus öffnen und einen Testeintrag speichern.
+Browser- und Gerätetests separat festhalten.
+
 ## Entwicklungs- und Releaseprozess
 
 - Verbindliche Zusammenarbeit: [AGENTS.md](AGENTS.md).

@@ -1,4 +1,4 @@
-import { makeSite, validateSite, MODULES, CATEGORY_REGISTRY } from './site-schema.js';
+import { makeSite, validateSite, MODULES, CATEGORY_REGISTRY, SITE_MODES } from './site-schema.js';
 import { generateProject, loadBrowserTemplates } from '../modules/site-generator.js';
 import { createZip } from '../modules/zip.js';
 const form = document.querySelector('#wizard');
@@ -10,6 +10,8 @@ const create = document.querySelector('#create');
 let busy = false;
 let revision = 0;
 const categorySelect = form.elements.namedItem('category');
+const modeSelect = form.elements.namedItem('mode');
+for (const [mode, label] of Object.entries(SITE_MODES)) modeSelect.add(new Option(label, mode));
 const presetSelect = form.elements.namedItem('preset');
 const placesEditor = document.querySelector('#places-editor');
 const sectionsEditor = document.querySelector('#sections-editor');
@@ -22,9 +24,12 @@ function syncCategory(preset, resetModules = false) {
   presetSelect.replaceChildren(...category.presets.map((item) => new Option(item.label, item.id)));
   if (preset) presetSelect.value = preset;
   const travel = category.contract === 'dated-places';
+  if (travel) modeSelect.value = 'website';
+  modeSelect.disabled = travel;
+  const showSections = !travel && modeSelect.value !== 'app';
   for (const selector of ['[data-travel-only]', '[data-general-only]']) {
     for (const section of document.querySelectorAll(selector)) {
-      const active = selector === '[data-travel-only]' ? travel : !travel;
+      const active = selector === '[data-travel-only]' ? travel : showSections;
       section.hidden = !active;
       for (const input of section.querySelectorAll('input,textarea')) input.disabled = !active;
       if (section.matches('label'))
@@ -108,6 +113,7 @@ categorySelect.addEventListener('change', () => {
   syncCategory(undefined, true);
   refresh();
 });
+modeSelect.addEventListener('change', () => syncCategory(presetSelect.value));
 document.querySelector('#add-place').addEventListener('click', () => {
   addPlace();
   refresh();
@@ -132,9 +138,10 @@ function config() {
             return { ...place, coordinates: [Number(lat), Number(lon)] };
           }),
         }
-      : { sections: readRows(sectionsEditor) };
+      : { sections: modeSelect.value === 'app' ? [] : readRows(sectionsEditor) };
   return makeSite({
     content,
+    mode: modeSelect.value,
     preset: values.get('preset'),
     locale: values.get('locale'),
     category: values.get('category'),
@@ -178,6 +185,16 @@ function refresh() {
       ? site.content.places.length + ' Orte'
       : site.content.sections.length + ' Abschnitte';
     preview.append(contentSummary);
+    const modeLabel = document.createElement('p');
+    modeLabel.textContent = SITE_MODES[site.mode ?? 'website'];
+    preview.append(modeLabel);
+    if (site.mode) {
+      const privacy = document.createElement('p');
+      privacy.textContent = site.mode === 'app'
+        ? 'Vorschau lokal oder mit Zugriffsschutz öffnen. Einträge liegen in diesem Browserprofil.'
+        : 'Die Website-Inhalte sind öffentlich. Planereinträge liegen in diesem Browserprofil.';
+      preview.append(privacy);
+    }
     const sections = site.content.sections;
     const modules = MODULES.filter((name) => site.modules[name]).map((name) =>
       form.elements.namedItem(name).labels[0].textContent.trim(),
@@ -189,6 +206,11 @@ function refresh() {
           ...(site.modules.map ? ['Karte'] : []),
           ...(site.modules.planning ? ['Mein Plan'] : []),
         ];
+    if (site.mode) {
+      if (site.mode === 'hybrid') navigation.push('Mein Planer');
+      else navigation.push('Eintrag erfassen', 'Einträge filtern', 'Daten sichern');
+      modules.push('Lokaler Ideen- und Aufgabenplaner');
+    }
     for (const [label, values] of [
       ['Startseite und Bereiche', navigation],
       ['Aktive Module', modules],
@@ -272,6 +294,7 @@ document.querySelector('#site-import').addEventListener('change', async (event) 
     const site = validateSite(input);
     if (revision !== startedAt) throw Error('Entwurf während des Imports geändert');
     categorySelect.value = site.category;
+    modeSelect.value = site.mode ?? 'website';
     syncCategory(site.preset);
     for (const key of ['id', 'title', 'description', 'color', 'locale'])
       form.elements.namedItem(key).value = site[key];
