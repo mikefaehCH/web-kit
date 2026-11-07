@@ -17,7 +17,7 @@ export function demoContext(page) {
           sources: [{ label: 'Route und GPX', url: context.url }],
         };
       }
-      if (/endet|ziel|wohin/.test(normalized)) {
+      if (/wo (?:genau )?endet|wo (?:liegt|ist) (?:das )?ziel|was ist (?:das )?ziel|wohin/.test(normalized)) {
         lastTopic = 'route';
         return { answer: 'Die Etappe endet in ' + context.destination + '.' };
       }
