@@ -10,8 +10,8 @@ Unter `/admin/#ki-entwurf` «Ich möchte meine Padel-Trainings erfassen.» wähl
 senden und übernehmen. In der Vorschau ein fiktives Training erfassen. Danach
 «Ergänze die Trainingsart.» senden und übernehmen. Rückgängig nimmt den letzten
 Vorschlag zurück. Einträge und Werte bleiben im lokalen Vorschauspeicher, auch
-wenn ein Feld vorübergehend ausgeblendet ist. Die Vorschau zeigt den letzten
-übernommenen KI-Entwurf. Der Export verwendet die aktuelle Wizard-Konfiguration.
+wenn ein Feld vorübergehend ausgeblendet ist. Nach manuellen Änderungen aktualisiert «Konfiguration prüfen» auch die
+interaktive Vorschau. Der Export verwendet die geprüfte Wizard-Konfiguration.
 Der ZIP-Export enthält die Felddefinitionen. Einträge bleiben im Browserprofil
 und lassen sich über das vorhandene Planer-Backup sichern.
 

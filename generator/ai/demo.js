@@ -1,4 +1,4 @@
-import { demoContext } from './demo-context.js';
+import { demoContext } from './demo-context.js?v=20261107-source';
 import { mountPageAssistants } from './embed.js';
 
 const pages = Object.fromEntries(['etappe-1', 'etappe-2'].map(id => {
