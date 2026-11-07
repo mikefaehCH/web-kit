@@ -1,4 +1,4 @@
-import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, loadPullRequestAttention } from './dashboard-data.js';
+import { PROJECTS, parseDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, loadPullRequestAttention } from './dashboard-data.js';
 
 const grid = document.querySelector('#project-grid');
 const updated = document.querySelector('#dashboard-updated');
@@ -136,14 +136,15 @@ async function refresh() {
   updated.textContent = 'GitHub-Daten werden geladen …';
   try {
     const now = Date.now();
-    const [results, deployment] = await Promise.all([Promise.all(PROJECTS.map(async project => {
+    const deployment = parseDeploymentInfo(document.querySelector('meta[name="web-kit-deployment"]')?.content);
+    const results = await Promise.all(PROJECTS.map(async project => {
       const saved = cache.get(project.repo);
       if (saved && now - saved.cachedAt < CACHE_MS) return saved.data;
       const data = await loadProjectData(project).catch(error => ({ project, loadedAt: new Date().toISOString(), issues: null, workflow: null, error: error.message || 'Abruf fehlgeschlagen' }));
       data.prAttention = await loadPullRequestAttention(project);
       cache.set(project.repo, { data, cachedAt: now });
       return data;
-    })), loadDeploymentInfo()]);
+    }));
     grid.replaceChildren(...results.map(item => cardFor(item, deployment)));
     applyFilter();
     const problems = [];

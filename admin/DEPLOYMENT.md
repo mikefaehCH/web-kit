@@ -8,7 +8,7 @@ Admin-Einstieg: <https://web-kit-admin.onrender.com/whatsapp.html>. Render verö
 - Offene Issues und Pull Requests: GitHub REST API, öffentlich und ohne Token.
 - CI: letzter Push-Workflow-Lauf auf `main` (nicht notwendigerweise der vollständige Satz aller Pflichtchecks). Er ist kein Deployment-Nachweis. Nur `success` wird grün, `failure` rot; laufende und unbekannte Ergebnisse werden separat angezeigt. Für den Gesamtstatus die Actions-Seite öffnen.
 - Website-Erreichbarkeit wird nicht live geprüft; Website- und Render-Links öffnen die jeweilige Plattform.
-- Render stellt beim Build Commit-SHA und Branch bereit. `build-static.mjs` schreibt diese nicht geheimen Werte als `deployment.json` in die veröffentlichte Site. Das Cockpit zeigt den aktuell ausgelieferten Build-Commit, die Branch-Angabe und den Buildzeitpunkt an. Ausserhalb eines Render-Builds bleiben die Werte ausdrücklich unbekannt.
+- Render stellt beim Build Commit-SHA und Branch bereit. `build-static.mjs` schreibt diese Werte samt Buildzeit in das ausgelieferte HTML und für externe Produktionschecks in `deployment.json`. Das Cockpit liest den Stand seiner eigenen Seite direkt aus dem HTML. Ausserhalb eines Render-Builds bleiben die Werte ausdrücklich unbekannt.
 - GitHub-Antworten werden bis 15 Minuten im Arbeitsspeicher zwischengespeichert. Keine periodische Abfrage.
 
 Ein fehlender, nicht lesbarer oder veralteter Status darf nicht als Erfolg interpretiert werden. API-Fehler werden sichtbar gemacht; Inhalte werden mit DOM-Textknoten dargestellt.

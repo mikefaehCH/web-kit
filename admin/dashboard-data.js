@@ -82,24 +82,18 @@ export async function loadProjectData(project, fetchImpl = fetch) {
   return result;
 }
 
-export async function loadDeploymentInfo(fetchImpl = fetch) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+export function parseDeploymentInfo(content) {
+  const unknown = { commit: null, branch: null, builtAt: null, error: null };
+  if (!content) return unknown;
   try {
-    const response = await fetchImpl(new URL('./deployment.json', import.meta.url), {
-      headers: { Accept: 'application/json' }, credentials: 'omit', redirect: 'error', signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`Deployment-Info HTTP ${response.status}`);
-    const info = await response.json();
+    const info = JSON.parse(decodeURIComponent(content));
     const validCommit = typeof info?.commit === 'string' && /^[0-9a-f]{40}$/i.test(info.commit);
     const validBranch = info?.branch === null || typeof info?.branch === 'string' && /^[A-Za-z0-9._/-]{1,100}$/.test(info.branch);
     const validBuiltAt = typeof info?.builtAt === 'string' && Number.isFinite(Date.parse(info.builtAt));
-    if (!validCommit || !validBranch || !validBuiltAt) return { commit: null, branch: null, builtAt: null, error: null };
-    return { commit: info.commit, branch: validBranch ? info.branch : null, builtAt: info.builtAt, error: null };
-  } catch (error) {
-    return { commit: null, branch: null, builtAt: null, error: error?.message || 'Deployment-Info nicht verfügbar' };
-  } finally {
-    clearTimeout(timer);
+    if (!validCommit || !validBranch || !validBuiltAt) return unknown;
+    return { commit: info.commit, branch: info.branch, builtAt: info.builtAt, error: null };
+  } catch {
+    return { ...unknown, error: 'Build-Information nicht lesbar' };
   }
 }
 
