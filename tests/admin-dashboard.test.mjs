@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { PROJECTS, loadDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, pullRequestAttention, loadPullRequestAttention } from '../admin/dashboard-data.js';
+import { PROJECTS, parseDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, pullRequestAttention, loadPullRequestAttention } from '../admin/dashboard-data.js';
 import { authGateState, isAdminUser } from '../admin/auth-policy.js';
 
 function response(body, status = 200) {
@@ -129,16 +129,18 @@ test('timeouts and network failures do not produce green status', async () => {
   assert.match(data.error, /timeout/);
 });
 
-test('Render deployment metadata is accepted only for a real commit SHA and timestamp', async () => {
-  const good = await loadDeploymentInfo(async () => response({ commit: 'a'.repeat(40), branch: 'main', builtAt: '2026-11-03T12:00:00.000Z' }));
+test('Embedded Render metadata accepts a commit SHA and timestamp and fails closed otherwise', () => {
+  const encode = info => encodeURIComponent(JSON.stringify(info));
+  const good = parseDeploymentInfo(encode({ commit: 'a'.repeat(40), branch: 'main', builtAt: '2026-11-03T12:00:00.000Z' }));
   assert.equal(good.commit, 'a'.repeat(40));
   assert.equal(good.branch, 'main');
-  const bad = await loadDeploymentInfo(async () => response({ commit: '<script>', branch: 'main', builtAt: 'yesterday' }));
+  const bad = parseDeploymentInfo(encode({ commit: '<script>', branch: 'main', builtAt: 'yesterday' }));
   assert.equal(bad.commit, null);
   assert.equal(bad.error, null);
-  const failed = await loadDeploymentInfo(async () => response({}, 503));
+  assert.equal(parseDeploymentInfo('').commit, null);
+  const failed = parseDeploymentInfo('%');
   assert.equal(failed.commit, null);
-  assert.match(failed.error, /503/);
+  assert.match(failed.error, /nicht lesbar/);
 });
 
 test('static shell has password auth, no public signup, safe DOM rendering and GitHub CSP', async () => {

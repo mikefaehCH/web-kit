@@ -1,4 +1,4 @@
-import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,7 +11,6 @@ const files = [
   'dashboard.js',
   'dashboard-data.js',
   'whatsapp.css',
-  'whatsapp.html',
   'whatsapp.js',
   'batch-ui.js',
   'vendor/supabase.js',
@@ -31,4 +30,10 @@ const renderBranch = process.env.RENDER_GIT_BRANCH;
 const deployment = /^[0-9a-f]{40}$/i.test(renderCommit || '')
   ? { commit: renderCommit.toLowerCase(), branch: /^[A-Za-z0-9._/-]{1,100}$/.test(renderBranch || '') ? renderBranch : null, builtAt: new Date().toISOString() }
   : { commit: null, branch: null, builtAt: null };
-await writeFile(join(output, 'deployment.json'), `${JSON.stringify(deployment)}\n`, { encoding: 'utf8', mode: 0o644 });
+const deploymentJson = JSON.stringify(deployment);
+const html = await readFile(join(root, 'whatsapp.html'), 'utf8');
+const marker = '<meta name="web-kit-deployment" content="">';
+if (!html.includes(marker)) throw new Error('Missing build metadata marker in whatsapp.html');
+await writeFile(join(output, 'whatsapp.html'), html.replace(marker,
+  `<meta name="web-kit-deployment" content="${encodeURIComponent(deploymentJson)}">`));
+await writeFile(join(output, 'deployment.json'), `${deploymentJson}\n`, { encoding: 'utf8', mode: 0o644 });
