@@ -36,4 +36,20 @@ const marker = '<meta name="web-kit-deployment" content="">';
 if (!html.includes(marker)) throw new Error('Missing build metadata marker in whatsapp.html');
 await writeFile(join(output, 'whatsapp.html'), html.replace(marker,
   `<meta name="web-kit-deployment" content="${encodeURIComponent(deploymentJson)}">`));
+// Render serves the service root from index.html. Forward it to the single
+// canonical admin entry so login and auth redirects keep one URL. No script
+// is needed, so the existing CSP stays unchanged.
+await writeFile(join(output, 'index.html'), `<!doctype html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="refresh" content="0; url=./whatsapp.html">
+<title>Web-Kit Verwaltung</title>
+</head>
+<body>
+<p><a href="./whatsapp.html">Zur Web-Kit Verwaltung</a></p>
+</body>
+</html>
+`);
 await writeFile(join(output, 'deployment.json'), `${deploymentJson}\n`, { encoding: 'utf8', mode: 0o644 });
