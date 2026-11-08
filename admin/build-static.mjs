@@ -34,6 +34,9 @@ const deploymentJson = JSON.stringify(deployment);
 const html = await readFile(join(root, 'whatsapp.html'), 'utf8');
 const marker = '<meta name="web-kit-deployment" content="">';
 if (!html.includes(marker)) throw new Error('Missing build metadata marker in whatsapp.html');
-await writeFile(join(output, 'whatsapp.html'), html.replace(marker,
-  `<meta name="web-kit-deployment" content="${encodeURIComponent(deploymentJson)}">`));
+const builtHtml = html.replace(marker,
+  `<meta name="web-kit-deployment" content="${encodeURIComponent(deploymentJson)}">`);
+await writeFile(join(output, 'whatsapp.html'), builtHtml);
+// The static site's root URL must serve the same authenticated admin entry point.
+await writeFile(join(output, 'index.html'), builtHtml);
 await writeFile(join(output, 'deployment.json'), `${deploymentJson}\n`, { encoding: 'utf8', mode: 0o644 });
