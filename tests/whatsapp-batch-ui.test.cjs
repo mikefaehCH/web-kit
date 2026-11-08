@@ -49,8 +49,9 @@ test('older history can be opened without sending a message',async()=>{
   assert.equal(el('batch-jobs').children.length,21);
   await el('batch-jobs').children[20].fire('click');
   assert.equal(t.actions[1].before,'batch-19');
-  assert.equal(el('batch-jobs').children.length,1);
-  await el('batch-jobs').children[0].children[0].fire('click');
+  assert.equal(el('batch-jobs').children.length,21);
+  assert.equal(el('batch-jobs').children[0].children[0].textContent,'Auftrag date-0');
+  await el('batch-jobs').children[20].children[0].fire('click');
   assert.equal(t.actions[2].action,'batch_inspect');assert.equal(t.actions[2].batchId,'batch-20');
   assert.ok(!t.actions.some(a=>a.action==='batch_send'));
 });
