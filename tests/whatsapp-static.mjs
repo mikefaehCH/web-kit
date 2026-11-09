@@ -28,7 +28,9 @@ assert.doesNotMatch(auth,/signUp\(/);
 assert.match(auth,/isAdminUser\(user\)/);
 assert.match(js,/approvedMessage/);
 assert.doesNotMatch(js,/send_selected/);
-assert.match(js,/vorübergehend nicht verfügbar/);
+assert.doesNotMatch(js,/vorübergehend nicht verfügbar/);
+assert.match(js,/JSON\.stringify\(\{message:approvedMessage,requestKey\}\)/);
+assert.doesNotMatch(js,/chatId|caminoId|selectedRecipients/);
 assert.match(edge,/web_kit_whatsapp_claim/);
 assert.match(edge,/web_kit_whatsapp_finish/);
 
