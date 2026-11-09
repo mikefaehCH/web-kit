@@ -10,21 +10,24 @@ class Element {
   replaceChildren(...nodes){this.children=nodes;}
   setAttribute(){} removeAttribute(){}
 }
-function setup(enabled, history=[], failInspect=false, contacts=[{id:'41790000000@c.us',name:'Test'}]){
+function setup(enabled, history=[], failInspect=false, contacts=[{id:'41790000000@c.us',name:'Test'}], failOnceAction=null){
   const nodes=new Map(), actions=[];
   const document={getElementById(id){if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},createElement(){return new Element();},createTextNode(text){return {text};}};
   const events={};
   const window={addEventListener:(name,fn)=>{events[name]=fn;},WEB_KIT_WHATSAPP_BATCH_UI_ENABLED:enabled,WEB_KIT_GET_ACCESS_TOKEN:async()=>'fake',WEB_KIT_WHATSAPP_ENDPOINT:'https://example.invalid',confirm:()=>true};
+  let failedOnce=false;
   const fetch=async(_url,init)=>{const req=JSON.parse(init.body);actions.push(req);let data={};
     if(req.action==='batch_list')data={batches:req.before ? history.slice(20) : history.slice(0,20)};
     if(req.action==='list_contacts')data={contacts};
     if(req.action==='batch_projects_list')data={projects:['camino']};
     if(req.action==='batch_project_list')data={recipients:['41790000000@c.us']};
     if(req.action==='batch_project_set')data={ok:true};
-    if(req.action==='batch_create')data={ok:true};
+    if(req.action==='batch_create'){data={ok:true};history.unshift({id:req.batchId,createdAt:'synthetic-created'});}
     if(req.action==='batch_send')data={stopped:false};
     if(req.action==='batch_inspect')data={items:[{id:'i',chatId:'41790000000@c.us',status:'accepted',reviewAvailable:false}]};
-    return {ok:!(failInspect && req.action==='batch_inspect'),json:async()=>data};};
+    const ambiguous=req.action===failOnceAction&&!failedOnce;
+    if(ambiguous)failedOnce=true;
+    return {ok:!(failInspect && req.action==='batch_inspect')&&!ambiguous,json:async()=>data};};
   vm.runInNewContext(fs.readFileSync('admin/batch-ui.js','utf8'),{window,document,fetch,crypto:{randomUUID:()=> 'aaaaaaaa-1111-4111-8111-111111111111'}});
   return {nodes,actions,document,events,window};
 }
@@ -116,4 +119,46 @@ test('project assignments load and update without sending messages',async()=>{
   assert.equal(calls.length,2);assert.equal(calls[0].project,'camino');assert.equal(calls[0].selected,true);assert.equal(calls[1].selected,false);assert.deepEqual(calls[0].recipients,['41790000000@c.us']);
   assert.ok(!t.actions.some(a=>a.action==='batch_send'));
   el('logout').fire('click');assert.equal(el('batch-project').value,'');assert.equal(el('batch-project-options').children.length,0);
+});
+
+test('ambiguous create response cannot create a second batch before inspecting the first',async()=>{
+  const t=setup(true,[],false,undefined,'batch_create'),el=id=>t.document.getElementById(id);
+  await el('batch-load-contacts').fire('click');
+  const check=el('batch-contacts').children[0].children[0].children[0];
+  check.checked=true;check.fire('change');
+  el('batch-message').value='Synthetic test message';
+  el('batch-review-button').fire('click');
+  await el('batch-confirm').fire('click');
+  assert.equal(t.actions.filter(a=>a.action==='batch_create').length,1);
+  assert.match(el('batch-ui-status').textContent,/Ergebnis unklar/);
+  el('batch-review-button').fire('click');
+  await el('batch-confirm').fire('click');
+  assert.equal(t.actions.filter(a=>a.action==='batch_create').length,1,'Never generate a fresh batch ID after an uncertain create');
+  assert.equal(t.actions.filter(a=>a.action==='batch_send').length,0);
+  await el('batch-load-jobs').fire('click');
+  await el('batch-jobs').children[0].children[0].fire('click');
+  assert.equal(t.actions.at(-1).action,'batch_inspect');
+  el('batch-review-button').fire('click');
+  assert.equal(el('batch-review').hidden,false,'Only a successful status inspection allows a fresh manual review');
+  assert.equal(t.actions.filter(a=>a.action==='batch_send').length,0);
+});
+
+test('ambiguous send response blocks manual repeat until batch inspection',async()=>{
+  const t=setup(true,[],false,undefined,'batch_send'),el=id=>t.document.getElementById(id);
+  await el('batch-load-contacts').fire('click');
+  const check=el('batch-contacts').children[0].children[0].children[0];
+  check.checked=true;check.fire('change');
+  el('batch-message').value='Synthetic test message';
+  el('batch-review-button').fire('click');
+  await el('batch-confirm').fire('click');
+  assert.equal(t.actions.filter(a=>a.action==='batch_send').length,1);
+  el('batch-review-button').fire('click');
+  await el('batch-confirm').fire('click');
+  assert.equal(t.actions.filter(a=>a.action==='batch_send').length,1,'Never send again before reconciliation');
+  await el('batch-load-jobs').fire('click');
+  await el('batch-jobs').children[0].children[0].fire('click');
+  assert.equal(t.actions.at(-1).action,'batch_inspect');
+  el('batch-review-button').fire('click');
+  assert.equal(el('batch-review').hidden,false);
+  assert.equal(t.actions.filter(a=>a.action==='batch_send').length,1,'Inspecting never triggers a send by itself');
 });
