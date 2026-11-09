@@ -1,4 +1,5 @@
 import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,7 +12,6 @@ const files = [
   'dashboard.js',
   'dashboard-data.js',
   'whatsapp.css',
-  'whatsapp.js',
   'batch-ui.js',
   'vendor/supabase.js',
   'vendor/LICENSES.txt',
@@ -34,8 +34,14 @@ const deploymentJson = JSON.stringify(deployment);
 const html = await readFile(join(root, 'whatsapp.html'), 'utf8');
 const marker = '<meta name="web-kit-deployment" content="">';
 if (!html.includes(marker)) throw new Error('Missing build metadata marker in whatsapp.html');
-await writeFile(join(output, 'whatsapp.html'), html.replace(marker,
-  `<meta name="web-kit-deployment" content="${encodeURIComponent(deploymentJson)}">`));
+const scriptMarker = '<script type="module" src="./whatsapp.js"></script>';
+if (!html.includes(scriptMarker)) throw new Error('Missing WhatsApp script marker in whatsapp.html');
+const whatsapp = await readFile(join(root, 'whatsapp.js'));
+const whatsappName = `whatsapp.${createHash('sha256').update(whatsapp).digest('hex').slice(0, 12)}.js`;
+await writeFile(join(output, whatsappName), whatsapp);
+await writeFile(join(output, 'whatsapp.html'), html
+  .replace(marker, `<meta name="web-kit-deployment" content="${encodeURIComponent(deploymentJson)}">`)
+  .replace(scriptMarker, `<script type="module" src="./${whatsappName}"></script>`));
 // Render serves the service root from index.html. Forward it to the single
 // canonical admin entry so login and auth redirects keep one URL. No script
 // is needed, so the existing CSP stays unchanged.
