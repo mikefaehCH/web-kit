@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -27,4 +27,13 @@ test('Deployment-Metadaten bleiben im Einstieg und in deployment.json gleich', (
   const meta = dist('whatsapp.html').match(/<meta name="web-kit-deployment" content="([^"]+)">/)?.[1];
   assert.ok(meta, 'Deployment-Marker fehlt in whatsapp.html');
   assert.deepEqual(JSON.parse(decodeURIComponent(meta)), deployment);
+});
+
+test('geänderte WhatsApp-Logik erhält eine inhaltsadressierte URL', () => {
+  execFileSync(process.execPath, [build], { env: { ...process.env, RENDER_GIT_COMMIT: commit, RENDER_GIT_BRANCH: 'main' } });
+  const html = dist('whatsapp.html');
+  const script = html.match(/<script type="module" src="\.\/(whatsapp\.[0-9a-f]{12}\.js)"><\/script>/)?.[1];
+  assert.ok(script, 'Inhaltsadressierte WhatsApp-Datei fehlt');
+  assert.equal(dist(script), readFileSync(new URL('../admin/whatsapp.js', import.meta.url), 'utf8'));
+  assert.equal(readdirSync(new URL('../admin/dist/', import.meta.url)).includes('whatsapp.js'), false);
 });
