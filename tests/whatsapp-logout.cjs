@@ -14,7 +14,6 @@ const document = { querySelector(s) { if (!els.has(s)) els.set(s, new Element())
 const storage = new Map();
 const sessionStorage = { getItem: k => storage.get(k) ?? null, setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) };
 vm.runInNewContext(fs.readFileSync('admin/whatsapp.js', 'utf8'), { document, sessionStorage, window: {}, crypto: { randomUUID: () => 'test-key' } });
-els.get('#camino-recipient').checked = true;
 els.get('#message').value = 'Synthetic message';
 els.get('#message').fire('input');
 els.get('#composer').fire('submit');
