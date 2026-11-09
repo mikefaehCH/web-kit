@@ -4,11 +4,12 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
   const ui = $('batch-ui'), status = $('batch-ui-status'), list = $('batch-contacts'), jobs = $('batch-jobs'), results = $('batch-results');
   const message = $('batch-message'), preview = $('batch-preview'), selected = new Map(), search = $('batch-contacts-search');
   let contactRows = [];
-  let epoch = 0, busy = false, activeBatch = null, reviewed = null, historyCursor = null;
+  let epoch = 0, busy = false, activeBatch = null, reviewed = null, historyCursor = null, needsStatusCheck = null;
   ui.hidden = false;
   $('batch-unavailable').hidden = true;
   function item(parent, value) { const li = document.createElement('li'); li.textContent = value; parent.append(li); return li; }
   function resetReview() { reviewed = null; $('batch-review').hidden = true; }
+  function unresolvedStatus() { status.textContent = 'Auftrag '+needsStatusCheck+': Ergebnis unklar. Bitte den Auftrag unter «Aufträge laden» öffnen und den Status prüfen, bevor du erneut bestätigst.'; }
   async function call(action, payload = {}) {
     const requestEpoch = epoch;
     const token = await window.WEB_KIT_GET_ACCESS_TOKEN();
@@ -21,13 +22,14 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
   async function work(fn) {
     if (busy) return;
     busy = true; const snapshot = epoch; ui.setAttribute('aria-busy','true');
-    try { await fn(snapshot); } catch { if (snapshot === epoch) status.textContent = 'Die Aktion konnte nicht bestätigt werden. Lade die Liste erneut und prüfe den betroffenen Auftrag.'; }
+    try { await fn(snapshot); } catch { if (snapshot === epoch) { if (needsStatusCheck) unresolvedStatus(); else status.textContent = 'Die Aktion konnte nicht bestätigt werden. Lade die Liste erneut und prüfe den betroffenen Auftrag.'; } }
     finally { busy = false; ui.removeAttribute('aria-busy'); }
   }
   function visible(snapshot) { return snapshot === epoch; }
   async function inspect(id, snapshot) {
     const data = await call('batch_inspect',{batchId:id}); if (!visible(snapshot)) return;
     if (!Array.isArray(data.items)) throw Error('status');
+    if (needsStatusCheck === id) { needsStatusCheck = null; resetReview(); }
     results.replaceChildren();
     const names = {queued:'Wartet',pending:'In Bearbeitung – Status unklar',unknown:'Unklar – in WhatsApp prüfen',reviewed:'Manuell geprüft; nicht erneut gesendet',accepted:'Vom Dienst angenommen; Zustellung nicht bestätigt',failed:'Abgelehnt'};
     for (const row of data.items) {
@@ -104,7 +106,7 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
   }
   message.addEventListener('input',resetReview);
   $('batch-review-button').addEventListener('click',()=>{
-    if(busy)return;const text=message.value.trim(), recipients=[...selected.entries()];
+    if(busy)return;if(needsStatusCheck){unresolvedStatus();return;}const text=message.value.trim(), recipients=[...selected.entries()];
     if(!text || (!activeBatch && !recipients.length) || recipients.length>10){status.textContent='Bitte Nachricht und bis zu zehn Empfänger auswählen.';return;}
     reviewed={text, recipients, batchId:activeBatch};preview.textContent=text;const targets=$('batch-preview-recipients');targets.replaceChildren();
     if(activeBatch)item(targets,'Bestehender Auftrag – Empfänger siehe Statusliste.');else for(const [id,name] of recipients)item(targets,name+' · '+id);
@@ -112,8 +114,13 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
   });
   $('batch-confirm').addEventListener('click',()=>work(async snap=>{
     const approved=reviewed;if(!approved || message.value.trim()!==approved.text)return;
+    if(needsStatusCheck){unresolvedStatus();return;}
     let id=approved.batchId;
-    if(!id){id=crypto.randomUUID();activeBatch=id;await call('batch_create',{batchId:id,message:approved.text,recipients:approved.recipients.map(([contact])=>contact)});}
+    if(!id){id=crypto.randomUUID();activeBatch=id;}
+    // Once a write starts, its outcome may be ambiguous even if the HTTP request fails.
+    // Do not allow another confirmation until this exact batch has been inspected.
+    needsStatusCheck=id;
+    if(!approved.batchId)await call('batch_create',{batchId:id,message:approved.text,recipients:approved.recipients.map(([contact])=>contact)});
     if(!visible(snap))return;
     resetReview();status.textContent='Versand wird verarbeitet …';
     const result=await call('batch_send',{batchId:id,message:approved.text});if(!visible(snap))return;
@@ -121,7 +128,7 @@ if (window.WEB_KIT_WHATSAPP_BATCH_UI_ENABLED === true) {
     status.textContent=result.stopped?'Versand angehalten. Bitte Status pro Empfänger prüfen.':'Versandlauf verarbeitet. Annahme ist keine Zustellbestätigung.';
   }));
   $('batch-cancel').addEventListener('click',resetReview);
-  function clearSession() { epoch++; selected.clear(); activeBatch=null; historyCursor=null; contactRows=[]; search.value=''; $('batch-project').value=''; $('batch-project-options').replaceChildren(); resetReview(); message.value=''; preview.textContent=''; $('batch-preview-recipients').replaceChildren(); list.replaceChildren(); jobs.replaceChildren(); results.replaceChildren(); status.textContent=''; }
+  function clearSession() { epoch++; selected.clear(); activeBatch=null; needsStatusCheck=null; historyCursor=null; contactRows=[]; search.value=''; $('batch-project').value=''; $('batch-project-options').replaceChildren(); resetReview(); message.value=''; preview.textContent=''; $('batch-preview-recipients').replaceChildren(); list.replaceChildren(); jobs.replaceChildren(); results.replaceChildren(); status.textContent=''; }
   $('logout').addEventListener('click',clearSession);
   window.addEventListener('web-kit-admin-authenticated',clearSession);
 }
