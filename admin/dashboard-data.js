@@ -10,6 +10,13 @@ export const PROJECTS = Object.freeze([
 const API = 'https://api.github.com';
 const OWNER = 'mikefaehCH';
 const REQUEST_TIMEOUT_MS = 8_000;
+const CACHE_MS = 15 * 60 * 1000;
+
+export function readProjectCache(saved, now, bypassCache = false) {
+  const age = now - saved?.cachedAt;
+  if (bypassCache || !Number.isFinite(age) || age < 0 || age >= CACHE_MS) return null;
+  return saved.data ?? null;
+}
 
 async function githubJson(path, fetchImpl) {
   const url = new URL(path, API);

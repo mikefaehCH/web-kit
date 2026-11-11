@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { PROJECTS, parseDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, pullRequestAttention, loadPullRequestAttention } from '../admin/dashboard-data.js';
+import { PROJECTS, parseDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, pullRequestAttention, loadPullRequestAttention, readProjectCache } from '../admin/dashboard-data.js';
 import { authGateState, isAdminUser } from '../admin/auth-policy.js';
 
 function response(body, status = 200) {
@@ -11,6 +11,15 @@ function response(body, status = 200) {
 test('dashboard only contains the six verified public projects', () => {
   assert.deepEqual(PROJECTS.map(project => project.repo), ['web-kit', 'Sommer2027', 'camino', 'zuerich', 'Valencia', 'edinburgh']);
   assert.ok(PROJECTS.every(project => project.url.startsWith('https://')));
+});
+
+test('manual dashboard refresh bypasses the short session cache', () => {
+  const data = { mainSha: 'a'.repeat(40) };
+  const saved = { data, cachedAt: 1_000 };
+  assert.equal(readProjectCache(saved, 1_001), data);
+  assert.equal(readProjectCache(saved, 1_001, true), null);
+  assert.equal(readProjectCache(saved, 1_000 + 15 * 60 * 1000), null);
+  assert.equal(readProjectCache(saved, 999), null);
 });
 
 test('admin authorization is exact and cannot be granted by user metadata', () => {
@@ -163,6 +172,7 @@ test('static shell has password auth, no public signup, safe DOM rendering and G
   assert.doesNotMatch(auth, /signUp\(/);
   assert.doesNotMatch(dashboard, /innerHTML|insertAdjacentHTML/);
   assert.match(dashboard, /textContent/);
+  assert.match(dashboard, /refreshButton\.addEventListener\('click', \(\) => refresh\(true\)\)/);
   assert.match(render, /connect-src 'self' https:\/\/qoensghjemruqafrbmjd\.supabase\.co https:\/\/api\.github\.com;/);
 });
 
