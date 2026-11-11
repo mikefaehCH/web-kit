@@ -1,4 +1,4 @@
-import { PROJECTS, parseDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, loadPullRequestAttention } from './dashboard-data.js';
+import { PROJECTS, parseDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, loadPullRequestAttention, readProjectCache } from './dashboard-data.js';
 
 const grid = document.querySelector('#project-grid');
 const updated = document.querySelector('#dashboard-updated');
@@ -11,7 +11,6 @@ emptyFilter.setAttribute('role', 'status');
 emptyFilter.hidden = true;
 grid.before(emptyFilter);
 const cache = new Map();
-const CACHE_MS = 15 * 60 * 1000;
 let busy = false;
 
 function link(label, href, className = '') {
@@ -129,7 +128,7 @@ function applyFilter() {
     : 'Keine Projekte für diese Ansicht gefunden.';
 }
 
-async function refresh() {
+async function refresh(bypassCache = false) {
   if (busy) return;
   busy = true;
   refreshButton.disabled = true;
@@ -138,8 +137,8 @@ async function refresh() {
     const now = Date.now();
     const deployment = parseDeploymentInfo(document.querySelector('meta[name="web-kit-deployment"]')?.content);
     const results = await Promise.all(PROJECTS.map(async project => {
-      const saved = cache.get(project.repo);
-      if (saved && now - saved.cachedAt < CACHE_MS) return saved.data;
+      const saved = readProjectCache(cache.get(project.repo), now, bypassCache);
+      if (saved) return saved;
       const data = await loadProjectData(project).catch(error => ({ project, loadedAt: new Date().toISOString(), issues: null, workflow: null, error: error.message || 'Abruf fehlgeschlagen' }));
       data.prAttention = await loadPullRequestAttention(project);
       cache.set(project.repo, { data, cachedAt: now });
@@ -179,7 +178,7 @@ async function refresh() {
   }
 }
 
-refreshButton.addEventListener('click', refresh);
+refreshButton.addEventListener('click', () => refresh(true));
 projectFilter.addEventListener('change', applyFilter);
-window.addEventListener('web-kit-admin-authenticated', refresh);
+window.addEventListener('web-kit-admin-authenticated', () => refresh());
 if (!document.querySelector('#workspace').hidden) refresh();
