@@ -125,6 +125,10 @@ export function mainWorkflowAttention(runs, mainSha) {
   const latest = new Map();
   for (const run of runs) {
     if (run.head_branch !== 'main' || run.head_sha !== mainSha || !run.name) continue;
+    // The merge orchestrator listens to completed PR workflows. For main runs
+    // its guarded job is expected to skip because there is no PR to merge.
+    // Keep every other skipped, failed or running workflow visible.
+    if (run.name === 'Autonomous merge' && run.event === 'workflow_run' && run.status === 'completed' && run.conclusion === 'skipped') continue;
     if (!latest.has(run.name)) latest.set(run.name, run);
   }
   if (!latest.size) return null;

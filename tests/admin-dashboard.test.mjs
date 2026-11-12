@@ -197,10 +197,13 @@ test('an old or unverifiable successful CI run is not green', () => {
 
 test('latest main workflows expose failure and do not hide unknown', () => {
   const sha = 'a'.repeat(40), old = 'b'.repeat(40);
-  const run = (name, conclusion, head_sha=sha) => ({name,head_sha,head_branch:'main',status:'completed',conclusion});
+  const run = (name, conclusion, head_sha=sha, event='push') => ({name,head_sha,head_branch:'main',status:'completed',conclusion,event});
   assert.deepEqual(mainWorkflowAttention([run('CI','failure'),run('CI','success'),run('Build','success'),run('Other','failure',old)],sha),[{name:'CI',state:'failure'}]);
   assert.equal(mainWorkflowAttention([],sha),null);
   assert.deepEqual(mainWorkflowAttention([run('CI','neutral')],sha),[{name:'CI',state:'unknown'}]);
+  assert.deepEqual(mainWorkflowAttention([run('Autonomous merge','skipped',sha,'workflow_run'),run('CI','success')],sha),[]);
+  assert.deepEqual(mainWorkflowAttention([run('Autonomous merge','failure',sha,'workflow_run')],sha),[{name:'Autonomous merge',state:'failure'}]);
+  assert.deepEqual(mainWorkflowAttention([run('Autonomous merge','skipped')],sha),[{name:'Autonomous merge',state:'unknown'}]);
 });
 
 test('PR workflow checks use current head and fail closed when missing', async () => {
