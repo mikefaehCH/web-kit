@@ -1,4 +1,4 @@
-import { PROJECTS, parseDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, loadPullRequestAttention, readProjectCache } from './dashboard-data.js';
+import { PROJECTS, parseDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, hasFailedCi, loadPullRequestAttention, readProjectCache } from './dashboard-data.js';
 
 const grid = document.querySelector('#project-grid');
 const updated = document.querySelector('#dashboard-updated');
@@ -44,7 +44,7 @@ function cardFor(data, deployment) {
   const deployed = deploymentState(project.repo === 'web-kit' ? null : data.pages, data.mainSha, deployedSha);
   const workflowProblems = mainWorkflowAttention(data.runs, data.mainSha);
   const needsAttention = !Array.isArray(data.prAttention) || data.prAttention.length > 0 || state !== 'success' || workflowProblems === null || workflowProblems.length > 0 || deployed !== 'current' || !issues || Boolean(error) || Boolean(issues?.issues || issues?.pullRequests);
-  card.dataset.failed = String(state === 'failure');
+  card.dataset.failed = String(hasFailedCi(state, workflowProblems, data.prAttention));
   card.dataset.attention = String(needsAttention);
   const badge = document.createElement('p');
   badge.className = `status status-${state}`;
@@ -124,7 +124,7 @@ function applyFilter() {
   const hasResults = [...grid.children].some(card => !card.hidden);
   emptyFilter.hidden = hasResults || !grid.children.length;
   emptyFilter.textContent = projectFilter.value === 'failed'
-    ? 'Keine Projekte mit fehlgeschlagenem letztem Main-Workflow gefunden. Unbekannte Zustände sind unter «Alle Projekte» sichtbar.'
+    ? 'Keine Projekte mit fehlgeschlagenen CI-Prüfungen gefunden. Laufende und unbekannte Zustände sind unter «Alle Projekte» sichtbar.'
     : 'Keine Projekte für diese Ansicht gefunden.';
 }
 

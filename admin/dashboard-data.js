@@ -135,6 +135,14 @@ export function mainWorkflowAttention(runs, mainSha) {
   return [...latest.values()].map(run => ({ name: run.name, state: workflowState(run) })).filter(run => run.state !== 'success');
 }
 
+// The failed filter covers every concrete CI failure already shown by the
+// dashboard, not only the single run used for the headline badge.
+export function hasFailedCi(state, workflowProblems, prAttention) {
+  return state === 'failure'
+    || Array.isArray(workflowProblems) && workflowProblems.some(run => run.state === 'failure')
+    || Array.isArray(prAttention) && prAttention.some(run => run.state === 'failure');
+}
+
 // Match PR workflows to the exact current head; absent or truncated data is unknown.
 export function pullRequestAttention(pulls, runs) {
   if (!Array.isArray(pulls) || !Array.isArray(runs)) return null;
