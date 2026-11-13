@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { PROJECTS, parseDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, pullRequestAttention, loadPullRequestAttention, readProjectCache } from '../admin/dashboard-data.js';
+import { PROJECTS, parseDeploymentInfo, loadProjectData, workflowState, deploymentState, currentWorkflowState, mainWorkflowAttention, hasFailedCi, pullRequestAttention, loadPullRequestAttention, readProjectCache } from '../admin/dashboard-data.js';
 import { authGateState, isAdminUser } from '../admin/auth-policy.js';
 
 function response(body, status = 200) {
@@ -204,6 +204,14 @@ test('latest main workflows expose failure and do not hide unknown', () => {
   assert.deepEqual(mainWorkflowAttention([run('Autonomous merge','skipped',sha,'workflow_run'),run('CI','success')],sha),[]);
   assert.deepEqual(mainWorkflowAttention([run('Autonomous merge','failure',sha,'workflow_run')],sha),[{name:'Autonomous merge',state:'failure'}]);
   assert.deepEqual(mainWorkflowAttention([run('Autonomous merge','skipped')],sha),[{name:'Autonomous merge',state:'unknown'}]);
+});
+
+test('failed filter includes every concrete main and pull request CI failure', () => {
+  assert.equal(hasFailedCi('failure', [], []), true);
+  assert.equal(hasFailedCi('success', [{name:'Security',state:'failure'}], []), true);
+  assert.equal(hasFailedCi('success', [], [{number:7,name:'CI',state:'failure'}]), true);
+  assert.equal(hasFailedCi('success', [{name:'Security',state:'running'}], [{number:7,state:'unknown'}]), false);
+  assert.equal(hasFailedCi('unknown', null, null), false);
 });
 
 test('PR workflow checks use current head and fail closed when missing', async () => {
