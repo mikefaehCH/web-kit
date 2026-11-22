@@ -6,6 +6,12 @@ function save(key,value) {
  catch { alert('Der Gerätespeicher ist voll. Speichern war nicht möglich.'); return false; }
 }
 let name = read('name','Mia'), target = 'Papi', step = 0, help = 0, muted = false;
+const invitedName = new URLSearchParams(location.hash.slice(1)).get('vorname');
+if (invitedName && /^\p{L}[\p{L} -]{0,17}$/u.test(invitedName)) {
+ name = invitedName;
+ save('name', name);
+ history.replaceState(null, '', location.pathname + location.search);
+}
 let card, recorder, stream, session = 0;
 const player = new Audio();
 const clips = await fetch('audio.json').then(r => r.json());
@@ -74,7 +80,7 @@ function puzzle() {
   const lit=value===wanted && (help>0 || step===1 && i===word.indexOf(wanted));
   button(value,value===wanted?complete:guidance,'tile'+(lit?' lit':''),row);
  });
- button(help?'Gemeinsam legen':'Zeig mir',help?complete:guidance);
+ button(help?'✋ Gemeinsam legen':'☞ Zeig mir',help?complete:guidance);
  if(step===5)button('Zur Karte ›',()=>go(6));
 }
 function drawCard(edit) {
