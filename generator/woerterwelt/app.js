@@ -1,8 +1,13 @@
 const stage = document.querySelector('#stage');
-const prefix = 'woerterwelt.v1.';
+const familyId=localStorage.getItem('insel.active');
+const prefix=familyId?'insel.mail.'+familyId+'.':'woerterwelt.v1.';
 const read = (key, fallback) => JSON.parse(localStorage.getItem(prefix+key) || JSON.stringify(fallback));
 function save(key,value) {
- try { localStorage.setItem(prefix+key,JSON.stringify(value)); return true; }
+ try { localStorage.setItem(prefix+key,JSON.stringify(value));
+  if(familyId && ['card','words','voices','name'].includes(key)){
+   const k='insel.v2.'+familyId+'.patch';const patch=JSON.parse(localStorage.getItem(k)||'{}');patch['mail_'+key]=value;localStorage.setItem(k,JSON.stringify(patch));
+  }
+  return true; }
  catch { alert('Der Gerätespeicher ist voll. Speichern war nicht möglich.'); return false; }
 }
 let name = read('name','Mia'), target = 'Papi', step = 0, help = 0, muted = false;
