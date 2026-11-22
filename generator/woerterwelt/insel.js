@@ -104,7 +104,7 @@ async function treasure(){
   const requestId=read('request.'+prize.id,crypto.randomUUID());write('request.'+prize.id,requestId);
   const panel=node('div','',world,'panel');node('h2',prize.title,panel);node('p',prize.price+' Münzen einlösen?',panel);
   btn('Zurück',treasure,panel);const yes=btn('Ja, einlösen',async()=>{yes.disabled=true;try{cloud=await account.request('claim',{id:prize.id,request:requestId});localStorage.removeItem(key('request.'+prize.id));treasure();}catch{node('p','Bitte Verbindung und Guthaben prüfen.',panel);yes.disabled=false;}},panel,'primary');
- });picture(['eule','maus','drache','apfel'].includes(prize.image)?prize.image:'eule',b,'mini');btn('Preis anhören',()=>{const u=new SpeechSynthesisUtterance(prize.title+' für '+prize.price+' Münzen');u.lang='de-CH';const v=speechSynthesis.getVoices().find(v=>v.localService&&v.lang.startsWith('de'));if(v){u.voice=v;speechSynthesis.speak(u);}},world);b.disabled=!navigator.onLine||!!issue||w.earned-spent()<prize.price;}
+ });picture(['eule','maus','drache','apfel'].includes(prize.image)?prize.image:'eule',b,'mini');btn('Preis anhören',()=>{const u=new SpeechSynthesisUtterance(prize.title+' für '+prize.price+' Münzen');u.lang='de-CH';const v=speechSynthesis.getVoices().find(v=>v.localService&&v.lang.startsWith('de'));if(v){u.voice=v;speechSynthesis.speak(u);}},world);b.disabled=(cloud?.claims||[]).some(c=>c.prize===prize.id&&c.status==='offen')||!navigator.onLine||!!issue||w.earned-spent()<prize.price;}
  for(const c of cloud?.claims||[])node('p',c.title+' · '+c.status);
 }
 document.querySelector('#home').onclick=home;document.querySelector('#parents').onclick=()=>location.assign('eltern.html');document.querySelector('#treasure').onclick=treasure;

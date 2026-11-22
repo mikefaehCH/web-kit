@@ -19,7 +19,7 @@ function draw(){
  button('Preis anbieten',async()=>{if(!title.value.trim()||!cost.checkValidity())throw Error('Titel und Münzpreis prüfen.');state=await request('prize',{title:title.value.trim(),price:Number(cost.value),image:img.value});draw();},prizes);
  for(const p of state.prizes)button(p.title+' · '+p.price+' · '+(p.available?'pausieren':'anbieten'),async()=>{state=await request('toggle',{id:p.id});draw();},prizes);
  const requests=panel('Einlösungen');for(const c of state.claims){el('p',c.title+' · '+c.cost+' Münzen · '+c.status,requests);if(c.status==='offen')for(const status of ['erfüllt','storniert'])button(status,async()=>{state=await request('status',{id:c.id,status});draw();},requests);}
- const family=panel('Familienzugänge');const email=field('Google-Adresse des zweiten Elternteils',family,'email');button('Zugang vormerken',async()=>{if(!email.value||!email.checkValidity())throw Error('Adresse prüfen.');await request('invite',{email:email.value});el('p','Beim ersten Google-Login mit dieser Adresse tritt die Person der Familie bei.',family);},family);
+ const family=panel('Familienzugänge');const email=field('Google-Adresse des zweiten Elternteils',family,'email');button('Zugang vormerken',async()=>{if(!email.value||!email.checkValidity())throw Error('Adresse prüfen.');const invitation=await request('invite',{email:email.value});const url=new URL('eltern.html',location.href);url.hash='einladung='+invitation.code;const out=field('Privater Einladungslink (7 Tage gültig)',family);out.value=url.href;out.readOnly=true;out.select();},family);
  const username=field('Benutzername des Kindes',family);const pass=field('Neues Passwort',family,'password');
  for(const [caption,mode] of [['Kinderkonto anlegen','create'],['Passwort setzen','reset']])button(caption,async()=>{await manageChild(username.value,pass.value,mode);pass.value='';el('p','Gespeichert.',family);},family);
  button('Elternbereich schliessen',async()=>{await client.auth.signOut({scope:'local'});location.replace('./');});
@@ -30,8 +30,18 @@ async function enter(){
  const login=panel('Mit E-Mail und Passwort');const email=field('E-Mail',login,'email');const pw=field('Passwort',login,'password');
  button('Anmelden',async()=>{const {error}=await client.auth.signInWithPassword({email:email.value.trim(),password:pw.value});if(error)throw error;await enter();},login);
  button('Neues Elternkonto erstellen',async()=>{const {error}=await client.auth.signUp({email:email.value.trim(),password:pw.value});if(error)throw error;el('p','Bitte bestätige die E-Mail und melde dich anschliessend hier an.',login);},login);return;}
- state=await request('join');if(state.role!=='parent')throw Error('Bitte mit einem Elternkonto anmelden.');draw();
+ try{state=await request('read');}catch(err){
+  if(!err.message.includes('Kein Familienzugang'))throw err;
+  main.replaceChildren();el('h1','Deine Familie');
+  const invite=sessionStorage.getItem('insel.invitation');
+  if(invite)button('Einladung annehmen',async()=>{state=await request('join',{code:invite});sessionStorage.removeItem('insel.invitation');draw();});
+  else {el('p','Für eine bestehende Familie bitte den persönlichen Einladungslink öffnen.');button('Neue Familie eröffnen',async()=>{state=await request('join',{create:'yes'});draw();});}
+  return;
+ }
+ if(state.role!=='parent')throw Error('Bitte mit einem Elternkonto anmelden.');draw();
 }
+const invitation=new URLSearchParams(location.hash.slice(1)).get('einladung');
+if(invitation&&/^[0-9a-f-]{36}$/i.test(invitation)){sessionStorage.setItem('insel.invitation',invitation);history.replaceState(null,'',location.pathname);}
 enter().catch(e=>{el('p',e.message);button('Abmelden',async()=>{await client.auth.signOut({scope:'local'});location.reload();});});
 
 window.addEventListener('pagehide',()=>{sessionStorage.removeItem('insel.parent.v2');});

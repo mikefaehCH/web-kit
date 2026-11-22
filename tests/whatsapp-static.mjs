@@ -53,6 +53,8 @@ assert.deepEqual(migrations,[
   '20261102053907_web_kit_whatsapp_dispatch_control.sql',
   '20261102053911_web_kit_whatsapp_dispatch_finish.sql',
   '20261102061405_web_kit_whatsapp_service_role_only.sql',
+  '20261122213746_woerterinsel_familienbereich.sql',
+  '20261122214142_woerterinsel_einladungen.sql',
 ]);
 // Autonomer Runner: exakter HEAD, aktueller main-Basisstand, Opt-in und normale Merge-API.
 // GitHub selbst erzwingt konfigurierte Reviews und Pflichtchecks; der Runner nutzt keinen Bypass.
