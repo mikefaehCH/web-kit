@@ -14,6 +14,19 @@ function draw(){
  el('p',types[e.kind]+' «'+e.target+'» · '+(series.length-aided)+' selbst gelöst, '+aided+' mit Hilfe.',obs);}
  const s=panel('Schulbuchstabe');const letter=field('Für die nächste Runde (m, a, i, l, o, p)',s);letter.value=state.profile.school||'';
  button('Übernehmen',async()=>{const school=letter.value.trim().toLowerCase();if(!['','m','a','i','l','o','p'].includes(school))throw Error('Bitte einen eingeführten Buchstaben wählen.');state=await request('profile',{school});draw();},s);
+ const letters=panel('Eigene Wörter');const custom=field('Wort für die Kartenwerkstatt',letters);
+ button('Wort speichern',async()=>{const w=custom.value.trim();if(!/^\p{L}{1,14}$/u.test(w))throw Error('Bitte 1 bis 14 Buchstaben eingeben.');state=await request('profile',{mail_words:[...new Set([...(state.profile.mail_words||[]),w])]});draw();},letters);
+ if(navigator.mediaDevices?.getUserMedia&&window.MediaRecorder){
+  let rec;
+  const record=button('Wort aufnehmen',async()=>{
+   if(rec?.state==='recording'){rec.stop();return;}
+   const w=custom.value.trim();if(!/^\p{L}{1,14}$/u.test(w))throw Error('Zuerst das Wort eingeben.');
+   const stream=await navigator.mediaDevices.getUserMedia({audio:true});rec=new MediaRecorder(stream);const chunks=[];rec.ondataavailable=e=>chunks.push(e.data);
+   const timer=setTimeout(()=>{if(rec?.state==='recording')rec.stop();},9000);
+   rec.onstop=()=>{clearTimeout(timer);stream.getTracks().forEach(t=>t.stop());const r=new FileReader();r.onload=async()=>{try{state=await request('profile',{mail_words:[...new Set([...(state.profile.mail_words||[]),w])],mail_voices:{...state.profile.mail_voices,[w]:r.result}});draw();}catch(err){el('p',err.message,letters);}};r.readAsDataURL(new Blob(chunks,{type:rec.mimeType}));record.textContent='Wort aufnehmen';};
+   rec.start();record.textContent='Aufnahme beenden';
+  },letters);
+ }
  const prizes=panel('Familienpreise');const title=field('Preis',prizes);const cost=field('Münzen',prizes,'number');cost.min=1;cost.max=10000;cost.value='10';
  const img=el('select','',el('label','Preisbild ',prizes));for(const x of ['eule','maus','drache','apfel']){const o=el('option',x,img);o.value=x;}
  button('Preis anbieten',async()=>{if(!title.value.trim()||!cost.checkValidity())throw Error('Titel und Münzpreis prüfen.');state=await request('prize',{title:title.value.trim(),price:Number(cost.value),image:img.value});draw();},prizes);

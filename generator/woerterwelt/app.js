@@ -148,7 +148,7 @@ function parents(){
  for(const [w,v] of Object.entries(read('progress',{})))element('p',w+' · '+v);
 }
 document.querySelector('#home').onclick=()=>go(0);
-document.querySelector('#parent').onclick=()=>go(8,false);
+document.querySelector('#parent').onclick=()=>familyId?location.assign('eltern.html'):go(8,false);
 document.querySelector('#repeat').onclick=say;
 document.querySelector('#mute').onclick=e=>{muted=!muted;stop();e.target.textContent=muted?'Ton an':'Ton aus';e.target.setAttribute('aria-pressed',muted);};
 render();
