@@ -52,7 +52,9 @@ function task(announce){
  node('h1',titles[q.kind]);const panel=node('div','',world,'panel');
  if(q.kind==='post'){if(round.help)node('p',q.word,panel,'tag');node('div',q.word.slice(0,q.slot)+'□'+q.word.slice(q.slot+1),panel,'word');btn('◖)) '+q.word,()=>speak(q.word),panel);}
  if(q.kind==='brook'){const bridge=btn(q.target[0]+'  ⌒  '+q.target[1],()=>speak(q.target),panel,'bridge');const guide=picture(profile().pet,panel,'mini traveller');const cross=()=>{guide.animate([{transform:'translateX(-48px)'},{transform:'translateX(48px)'}],{duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:700});speak(q.target);};
- bridge.onclick=cross;let begin;bridge.onpointerdown=e=>{begin=e.clientX;bridge.setPointerCapture(e.pointerId);};bridge.onpointerup=e=>{if(Math.abs(e.clientX-begin)>16)cross();};}
+ bridge.onclick=cross;
+ bridge.onpointerdown=e=>bridge.setPointerCapture(e.pointerId);
+ }
  if(q.kind==='reverse')node('strong',q.target,panel,'word');
  if(q.kind==='atelier'&&q.target==='m')node('p','Ein m für das Namensschild der Maus.',panel);
  const row=node('div','',panel,'row');
